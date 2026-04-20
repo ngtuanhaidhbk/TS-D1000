@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TS-D1000 Auth Test</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section id="login-view" class="view">
+      <div class="card login-card">
+        <div class="brand">
+          <div class="brand-mark">TS</div>
+          <div>
+            <h1>Meeting Control</h1>
+            <p>Authentication test screen</p>
+          </div>
+        </div>
+
+        <form id="login-form" novalidate>
+          <label class="field">
+            <span>Username</span>
+            <input id="username" name="username" type="text" autocomplete="username" />
+            <small class="field-error" data-field-error="username"></small>
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input id="password" name="password" type="password" autocomplete="current-password" />
+            <small class="field-error" data-field-error="password"></small>
+          </label>
+
+          <div id="login-error" class="alert hidden" role="alert"></div>
+
+          <button id="login-button" class="button primary" type="submit">
+            <span class="button-label">Login</span>
+            <span class="button-spinner hidden"></span>
+          </button>
+        </form>
+
+        <div class="seed-box">
+          <strong>Seed accounts</strong>
+          <p><code>admin / Admin123!</code></p>
+          <p><code>operator / Operator123!</code></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="app-view" class="view hidden">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-mark small">TS</div>
+          <div>
+            <h2>Control Desk</h2>
+            <p id="role-badge"></p>
+          </div>
+        </div>
+        <nav>
+          <a href="#" class="nav-item active">Dashboard</a>
+          <a href="#" class="nav-item">Map View</a>
+          <a href="#" class="nav-item">Camera View</a>
+          <a href="#" class="nav-item admin-only">Config</a>
+          <a href="#" class="nav-item admin-only">Logs</a>
+        </nav>
+      </aside>
+
+      <section class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Authenticated session</p>
+            <h3 id="welcome-title">Dashboard</h3>
+          </div>
+          <div class="user-chip">
+            <span id="username-chip"></span>
+            <button id="logout-button" class="button danger ghost" type="button">Logout</button>
+          </div>
+        </header>
+
+        <div id="session-message" class="alert hidden" role="status"></div>
+
+        <div class="grid">
+          <article class="panel">
+            <h4>User Context</h4>
+            <dl class="meta">
+              <div><dt>User ID</dt><dd id="user-id"></dd></div>
+              <div><dt>Username</dt><dd id="user-name"></dd></div>
+              <div><dt>Role</dt><dd id="user-role"></dd></div>
+              <div><dt>Status</dt><dd id="user-status"></dd></div>
+            </dl>
+          </article>
+
+          <article class="panel">
+            <h4>Session Context</h4>
+            <dl class="meta">
+              <div><dt>Session ID</dt><dd id="session-id"></dd></div>
+              <div><dt>Expires At</dt><dd id="session-expiry"></dd></div>
+            </dl>
+          </article>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

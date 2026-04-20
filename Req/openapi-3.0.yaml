@@ -1,0 +1,1456 @@
+openapi: 3.0.3
+info:
+  title: TS-D1000 Meeting Control API
+  version: 1.0.0
+  description: >
+    API contract for the Desktop Meeting Control Application integrating
+    TS-D1000 conference system and PTZ cameras.
+servers:
+  - url: /api/v1
+tags:
+  - name: Authentication
+  - name: Users
+  - name: Layout
+  - name: TSD1000
+  - name: Cameras
+  - name: Mappings
+  - name: Speaking Requests
+  - name: Live View
+  - name: Logs
+  - name: Health
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login
+      description: Authenticate a user and create a session-backed JWT.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: admin
+              password: StrongPass123
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidCredentialsError'
+        '403':
+          $ref: '#/components/responses/UserInactiveError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout
+      description: Revoke the current authenticated session.
+      responses:
+        '200':
+          description: Logout success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Logged out
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Current auth context
+      responses:
+        '200':
+          description: Current user and session
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          session:
+                            $ref: '#/components/schemas/SessionContext'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/UserInactiveError'
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/UserStatus'
+        - in: query
+          name: role
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            example: createdAt
+        - in: query
+          name: sortOrder
+          schema:
+            $ref: '#/components/schemas/SortOrder'
+      responses:
+        '200':
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserListResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags: [Users]
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '200':
+          description: User created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /users/{id}:
+    put:
+      tags: [Users]
+      summary: Update user
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  /users/{id}/status:
+    patch:
+      tags: [Users]
+      summary: Activate or deactivate user
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserStatusRequest'
+      responses:
+        '200':
+          description: User status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '422':
+          $ref: '#/components/responses/BusinessRuleError'
+  /rooms/{roomId}/layout:
+    post:
+      tags: [Layout]
+      summary: Upload layout
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Layout uploaded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LayoutUploadResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /rooms/{roomId}/layout/devices:
+    put:
+      tags: [Layout]
+      summary: Save device positions
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveLayoutDevicesRequest'
+      responses:
+        '200':
+          description: Device positions saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /rooms/{roomId}/annotations:
+    post:
+      tags: [Layout]
+      summary: Create layout annotation
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationRequest'
+      responses:
+        '200':
+          description: Annotation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /annotations/{id}:
+    put:
+      tags: [Layout]
+      summary: Update layout annotation
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationRequest'
+      responses:
+        '200':
+          description: Annotation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /rooms/{roomId}/tsd/connection:
+    put:
+      tags: [TSD1000]
+      summary: Save TS-D1000 connection config
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TsdConnectionRequest'
+      responses:
+        '200':
+          description: Config saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /rooms/{roomId}/tsd/test-connection:
+    post:
+      tags: [TSD1000]
+      summary: Test TS-D1000 connection
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          result:
+                            type: string
+                            example: SUCCESS
+        '502':
+          $ref: '#/components/responses/IntegrationError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+  /rooms/{roomId}/tsd/sync-units:
+    post:
+      tags: [TSD1000]
+      summary: Sync TS-D units
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: Units synced
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          synced:
+                            type: integer
+                            example: 24
+  /rooms/{roomId}/operation-mode:
+    get:
+      tags: [TSD1000]
+      summary: Get operation mode
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: Room mode
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mode:
+                            $ref: '#/components/schemas/OperationMode'
+    put:
+      tags: [TSD1000]
+      summary: Set operation mode
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationModeRequest'
+      responses:
+        '200':
+          description: Mode updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /rooms/{roomId}/cameras:
+    get:
+      tags: [Cameras]
+      summary: List cameras
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: Cameras list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Camera'
+    post:
+      tags: [Cameras]
+      summary: Add camera
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCameraRequest'
+      responses:
+        '200':
+          description: Camera created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /cameras/{id}:
+    put:
+      tags: [Cameras]
+      summary: Update camera
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCameraRequest'
+      responses:
+        '200':
+          description: Camera updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /cameras/{id}/test-connection:
+    post:
+      tags: [Cameras]
+      summary: Test camera connection
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Camera test result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CameraConnectionTestResponse'
+  /cameras/{id}/presets:
+    get:
+      tags: [Cameras]
+      summary: List camera presets
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Preset list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/CameraPreset'
+    post:
+      tags: [Cameras]
+      summary: Create camera preset
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePresetRequest'
+      responses:
+        '200':
+          description: Preset created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /presets/{id}:
+    put:
+      tags: [Cameras]
+      summary: Update preset
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePresetRequest'
+      responses:
+        '200':
+          description: Preset updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /cameras/{id}/recall-preset:
+    post:
+      tags: [Cameras]
+      summary: Recall camera preset
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecallPresetRequest'
+      responses:
+        '200':
+          description: Preset recalled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '422':
+          $ref: '#/components/responses/BusinessRuleError'
+  /cameras/{id}/ptz:
+    post:
+      tags: [Cameras]
+      summary: Manual PTZ control
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PtzRequest'
+      responses:
+        '200':
+          description: PTZ command accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '422':
+          $ref: '#/components/responses/BusinessRuleError'
+  /rooms/{roomId}/mappings:
+    get:
+      tags: [Mappings]
+      summary: List mappings
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: Mapping list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+    post:
+      tags: [Mappings]
+      summary: Create mapping
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMappingRequest'
+      responses:
+        '200':
+          description: Mapping created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '422':
+          $ref: '#/components/responses/BusinessRuleError'
+  /mappings/{id}:
+    put:
+      tags: [Mappings]
+      summary: Update mapping
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMappingRequest'
+      responses:
+        '200':
+          description: Mapping updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /rooms/{roomId}/speaking-requests:
+    get:
+      tags: [Speaking Requests]
+      summary: List speaking requests
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/SpeakingRequestStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Speaking request list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /speaking-requests/{id}/approve:
+    post:
+      tags: [Speaking Requests]
+      summary: Approve speaking request
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestDecisionNote'
+      responses:
+        '200':
+          description: Request approved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: APPROVED
+        '422':
+          $ref: '#/components/responses/BusinessRuleError'
+        '502':
+          $ref: '#/components/responses/IntegrationError'
+  /speaking-requests/{id}/reject:
+    post:
+      tags: [Speaking Requests]
+      summary: Reject speaking request
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestDecisionNote'
+      responses:
+        '200':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '422':
+          $ref: '#/components/responses/BusinessRuleError'
+        '502':
+          $ref: '#/components/responses/IntegrationError'
+  /rooms/{roomId}/live-view/config:
+    get:
+      tags: [Live View]
+      summary: Get live view config
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: Live view config
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LiveViewConfig'
+  /rooms/{roomId}/live-view/layout:
+    put:
+      tags: [Live View]
+      summary: Change live view layout
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiveViewLayoutRequest'
+      responses:
+        '200':
+          description: Layout updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /audit-logs:
+    get:
+      tags: [Logs]
+      summary: List audit logs
+      parameters:
+        - in: query
+          name: actorUserId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /system-logs:
+    get:
+      tags: [Logs]
+      summary: List system logs
+      parameters:
+        - in: query
+          name: module
+          schema:
+            type: string
+        - in: query
+          name: level
+          schema:
+            $ref: '#/components/schemas/LogLevel'
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: System logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Service health
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: ok
+                          service:
+                            type: string
+                            example: api
+                          timestamp:
+                            type: string
+                            format: date-time
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RoomId:
+      in: path
+      name: roomId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      in: query
+      name: pageSize
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: username is required
+              details:
+                - field: username
+                  message: must not be empty
+    InvalidCredentialsError:
+      description: Invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: INVALID_CREDENTIALS
+              message: Invalid username or password
+              details: []
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Unauthorized
+              details: []
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: You do not have permission to perform this action
+              details: []
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: Resource not found
+              details: []
+    ConflictError:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: CONFLICT
+              message: Resource conflict
+              details: []
+    BusinessRuleError:
+      description: Business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: REQUEST_NOT_PENDING
+              message: Speaking request is not in pending state
+              details: []
+    UserInactiveError:
+      description: User inactive
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: USER_INACTIVE
+              message: User account is inactive
+              details: []
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: INTERNAL_ERROR
+              message: Unexpected server error
+              details: []
+    IntegrationError:
+      description: Upstream integration error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: TSD_COMMAND_FAILED
+              message: TS-D1000 command failed
+              details: []
+    ServiceUnavailableError:
+      description: Upstream service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: TSD_UNAVAILABLE
+              message: TS-D1000 is unavailable
+              details: []
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+      required: [success, data]
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+          required: [code, message, details]
+      required: [success, error]
+    SortOrder:
+      type: string
+      enum: [asc, desc]
+    UserRole:
+      type: string
+      enum: [ADMIN, OPERATOR]
+    UserStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+    OperationMode:
+      type: string
+      enum: [MANUAL, AUTOMATIC]
+    CameraProtocol:
+      type: string
+      enum: [ONVIF, VISCA]
+    CameraStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, OFFLINE]
+    SpeakingRequestStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED, EXPIRED, CANCELLED]
+    LogLevel:
+      type: string
+      enum: [INFO, WARN, ERROR]
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+      required: [id, username, role, status]
+    SessionContext:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+      required: [id, expiresAt]
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required: [username, password]
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+      required: [token, expiresAt, user]
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+      required: [page, pageSize, total, totalPages]
+    UserListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required: [items, pagination]
+    CreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+      required: [username, password, role, status]
+    UpdateUserRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 8
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+    UpdateUserStatusRequest:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/UserStatus'
+      required: [status]
+    LayoutUploadResponse:
+      type: object
+      properties:
+        layoutId:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+        fileType:
+          type: string
+          enum: [PDF, JPG, JPEG]
+      required: [layoutId, fileName, fileType]
+    LayoutDevice:
+      type: object
+      properties:
+        refType:
+          type: string
+          enum: [TSD_UNIT, CAMERA]
+        refId:
+          type: string
+          format: uuid
+        posX:
+          type: number
+          minimum: 0
+          maximum: 1
+        posY:
+          type: number
+          minimum: 0
+          maximum: 1
+        iconLabel:
+          type: string
+      required: [refType, refId, posX, posY]
+    SaveLayoutDevicesRequest:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/LayoutDevice'
+      required: [devices]
+    AnnotationRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        posX:
+          type: number
+          minimum: 0
+          maximum: 1
+        posY:
+          type: number
+          minimum: 0
+          maximum: 1
+      required: [text, posX, posY]
+    TsdConnectionRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        sseEndpoint:
+          type: string
+      required: [baseUrl, sseEndpoint]
+    OperationModeRequest:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/OperationMode'
+      required: [mode]
+    CameraCapabilities:
+      type: object
+      properties:
+        ptz:
+          type: boolean
+        preset:
+          type: boolean
+        stream:
+          type: boolean
+      required: [ptz, preset, stream]
+    Camera:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        protocol:
+          $ref: '#/components/schemas/CameraProtocol'
+        ipAddress:
+          type: string
+        status:
+          $ref: '#/components/schemas/CameraStatus'
+        capabilities:
+          $ref: '#/components/schemas/CameraCapabilities'
+      required: [id, name, protocol, ipAddress, status]
+    CreateCameraRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        protocol:
+          $ref: '#/components/schemas/CameraProtocol'
+        ipAddress:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+        password:
+          type: string
+        rtspUrl:
+          type: string
+        vendor:
+          type: string
+        model:
+          type: string
+      required: [name, protocol, ipAddress]
+    UpdateCameraRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        protocol:
+          $ref: '#/components/schemas/CameraProtocol'
+        ipAddress:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+        password:
+          type: string
+        rtspUrl:
+          type: string
+        vendor:
+          type: string
+        model:
+          type: string
+        status:
+          $ref: '#/components/schemas/CameraStatus'
+    CameraConnectionTestResponse:
+      type: object
+      properties:
+        result:
+          type: string
+          enum: [SUCCESS, PARTIAL, FAILED]
+        capabilities:
+          $ref: '#/components/schemas/CameraCapabilities'
+      required: [result, capabilities]
+    CameraPreset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        presetCode:
+          type: string
+        presetName:
+          type: string
+      required: [id, presetCode]
+    CreatePresetRequest:
+      type: object
+      properties:
+        presetCode:
+          type: string
+        presetName:
+          type: string
+      required: [presetCode]
+    RecallPresetRequest:
+      type: object
+      properties:
+        presetId:
+          type: string
+          format: uuid
+      required: [presetId]
+    PtzRequest:
+      type: object
+      properties:
+        action:
+          type: string
+          example: PAN_LEFT
+        speed:
+          type: number
+          minimum: 0
+          maximum: 1
+        durationMs:
+          type: integer
+          minimum: 1
+      required: [action, speed]
+    CreateMappingRequest:
+      type: object
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        presetId:
+          type: string
+          format: uuid
+      required: [unitId, cameraId, presetId]
+    UpdateMappingRequest:
+      type: object
+      properties:
+        cameraId:
+          type: string
+          format: uuid
+        presetId:
+          type: string
+          format: uuid
+        isActive:
+          type: boolean
+    RequestDecisionNote:
+      type: object
+      properties:
+        note:
+          type: string
+    LiveViewConfig:
+      type: object
+      properties:
+        maxViews:
+          type: integer
+          example: 4
+        selectedLayout:
+          type: integer
+          example: 4
+        cameras:
+          type: array
+          items:
+            type: object
+            properties:
+              cameraId:
+                type: string
+                format: uuid
+              name:
+                type: string
+              rtspUrl:
+                type: string
+            required: [cameraId, name]
+      required: [maxViews, selectedLayout, cameras]
+    LiveViewLayoutRequest:
+      type: object
+      properties:
+        layout:
+          type: integer
+          enum: [1, 2, 3, 4]
+        cameraIds:
+          type: array
+          items:
+            type: string
+      required: [layout, cameraIds]

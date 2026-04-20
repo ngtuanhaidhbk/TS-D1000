@@ -1,0 +1,295 @@
+openapi: 3.0.3
+info:
+  title: TS-D1000 Authentication API
+  version: 1.0.0
+  description: >
+    Authentication module API contract for the Desktop Meeting Control
+    Application integrating TS-D1000 and PTZ cameras.
+servers:
+  - url: /api/v1
+tags:
+  - name: Authentication
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+      description: Authenticate a user and create a session-backed access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: admin
+              password: StrongPass123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidCredentialsError'
+        '403':
+          $ref: '#/components/responses/UserInactiveError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout
+      description: Revoke the current authenticated session.
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Logged out
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current auth context
+      description: Return the current authenticated user and session context.
+      responses:
+        '200':
+          description: Current auth context
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/UserInactiveError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: username is required
+              details:
+                - field: username
+                  message: must not be empty
+    InvalidCredentialsError:
+      description: Invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: INVALID_CREDENTIALS
+              message: Invalid username or password
+              details: []
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            unauthorized:
+              value:
+                success: false
+                error:
+                  code: UNAUTHORIZED
+                  message: Unauthorized
+                  details: []
+            sessionExpired:
+              value:
+                success: false
+                error:
+                  code: SESSION_EXPIRED
+                  message: Session expired
+                  details: []
+            sessionRevoked:
+              value:
+                success: false
+                error:
+                  code: SESSION_REVOKED
+                  message: Session revoked
+                  details: []
+    UserInactiveError:
+      description: User inactive
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: USER_INACTIVE
+              message: User account is inactive
+              details: []
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: INTERNAL_ERROR
+              message: Unexpected server error
+              details: []
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+      required:
+        - success
+        - data
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+          required:
+            - code
+            - message
+            - details
+      required:
+        - success
+        - error
+    UserRole:
+      type: string
+      enum:
+        - ADMIN
+        - OPERATOR
+    UserStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - INACTIVE
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+      required:
+        - id
+        - username
+        - role
+        - status
+    SessionContext:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - expiresAt
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username input, trimmed before lookup
+        password:
+          type: string
+          description: Plaintext password input
+      required:
+        - username
+        - password
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Signed JWT access token
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - token
+        - expiresAt
+        - user
+    AuthMeResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        session:
+          $ref: '#/components/schemas/SessionContext'
+      required:
+        - user
+        - session

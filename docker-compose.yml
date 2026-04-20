@@ -1,0 +1,76 @@
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-tsd1000}-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tsd1000}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tsd1000}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+      target: development
+    container_name: ${COMPOSE_PROJECT_NAME:-tsd1000}-backend
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${API_INTERNAL_PORT:-3000}
+      API_PREFIX: ${API_PREFIX:-api/v1}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@database:5432/tsd1000}
+      JWT_SECRET: ${JWT_SECRET:-change-me-for-development}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+    ports:
+      - "${API_PORT:-3000}:${API_INTERNAL_PORT:-3000}"
+    volumes:
+      - .:/workspace
+      - api_node_modules:/workspace/apps/api/node_modules
+      - root_node_modules:/workspace/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm --filter api dev"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      target: development
+    container_name: ${COMPOSE_PROJECT_NAME:-tsd1000}-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${WEB_INTERNAL_PORT:-5173}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api/v1}
+    ports:
+      - "${WEB_PORT:-5173}:${WEB_INTERNAL_PORT:-5173}"
+    volumes:
+      - .:/workspace
+      - web_node_modules:/workspace/apps/web/node_modules
+      - root_node_modules:/workspace/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm --filter web dev -- --host 0.0.0.0 --port ${WEB_INTERNAL_PORT:-5173}"
+
+volumes:
+  postgres_data:
+  api_node_modules:
+  web_node_modules:
+  root_node_modules:

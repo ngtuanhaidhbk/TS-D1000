@@ -1,0 +1,44 @@
+{
+  "name": "ts-d1000-platform",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "auth:prepare": "powershell -ExecutionPolicy Bypass -File ./Start-AuthTestEnv.ps1",
+    "auth:test:api": "pnpm --filter api test",
+    "auth:test:web": "pnpm --filter web test",
+    "docker:auth:up": "docker compose -f docker-compose.auth.yml up --build",
+    "docker:auth:down": "docker compose -f docker-compose.auth.yml down",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter api build",
+    "build:web": "pnpm --filter web build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "start:api": "pnpm --filter api start",
+    "preview:web": "pnpm --filter web preview",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/eslint__js": "^8.42.3",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript-eslint": "^8.18.1"
+  }
+}
