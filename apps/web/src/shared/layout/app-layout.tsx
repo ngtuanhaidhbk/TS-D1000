@@ -6,6 +6,7 @@ import { useAuth } from '../providers/auth-provider';
 export function AppLayout() {
   const { user, logout } = useAuth();
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <div className="app-shell">
@@ -18,13 +19,36 @@ export function AppLayout() {
           <span className="nav-link nav-link-muted">Map View</span>
           <span className="nav-link nav-link-muted">Camera View</span>
           <span className="nav-link nav-link-muted">Manual Control</span>
-          {user?.role === 'ADMIN' ? (
+          <div className="nav-section">
+            <span className="nav-section-title">System Configuration</span>
+            <NavLink to="/config" className="nav-link">
+              Overview
+            </NavLink>
+            <NavLink to="/config/tsd" className="nav-link">
+              TS-D1000
+            </NavLink>
+            <NavLink to="/config/cameras" className="nav-link">
+              Cameras
+            </NavLink>
+            <NavLink to="/config/layout" className="nav-link">
+              Layout &amp; Map
+            </NavLink>
+            <NavLink to="/config/mappings" className="nav-link">
+              Mappings
+            </NavLink>
+            <NavLink to="/config/mode" className="nav-link">
+              Operation Mode
+            </NavLink>
+            <NavLink to="/config/readiness" className="nav-link">
+              Readiness Check
+            </NavLink>
+          </div>
+          {isAdmin ? (
             <NavLink to="/admin-only" className="nav-link">
               User Management
             </NavLink>
           ) : null}
-          {user?.role === 'ADMIN' ? <span className="nav-link nav-link-muted">Config</span> : null}
-          {user?.role === 'ADMIN' ? <span className="nav-link nav-link-muted">Logs</span> : null}
+          {isAdmin ? <span className="nav-link nav-link-muted">Logs</span> : null}
         </nav>
       </aside>
 

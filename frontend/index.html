@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TS-D1000 Auth Test</title>
+  <title>TS-D1000 System Configuration Test</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -13,8 +13,8 @@
         <div class="brand">
           <div class="brand-mark">TS</div>
           <div>
-            <h1>Meeting Control</h1>
-            <p>Authentication test screen</p>
+            <h1>TS-D1000 Control Desk</h1>
+            <p>Authentication + Role-Based Access + System Configuration</p>
           </div>
         </div>
 
@@ -57,11 +57,15 @@
           </div>
         </div>
         <nav>
-          <a href="#" class="nav-item active">Dashboard</a>
-          <a href="#" class="nav-item">Map View</a>
-          <a href="#" class="nav-item">Camera View</a>
-          <a href="#" class="nav-item admin-only">Config</a>
-          <a href="#" class="nav-item admin-only">Logs</a>
+          <button class="nav-item nav-button active" data-view="dashboard" type="button">Dashboard</button>
+          <button class="nav-item nav-button" data-view="overview" type="button">Config Overview</button>
+          <button class="nav-item nav-button" data-view="tsd" type="button">TS-D1000</button>
+          <button class="nav-item nav-button" data-view="cameras" type="button">Cameras</button>
+          <button class="nav-item nav-button" data-view="layout" type="button">Layout & Map</button>
+          <button class="nav-item nav-button" data-view="mappings" type="button">Mappings</button>
+          <button class="nav-item nav-button" data-view="mode" type="button">Operation Mode</button>
+          <button class="nav-item nav-button" data-view="readiness" type="button">Readiness Check</button>
+          <button class="nav-item nav-button admin-only" data-view="logs" type="button">Logs</button>
         </nav>
       </aside>
 
@@ -78,26 +82,17 @@
         </header>
 
         <div id="session-message" class="alert hidden" role="status"></div>
+        <div id="view-error" class="alert hidden" role="alert"></div>
 
-        <div class="grid">
-          <article class="panel">
-            <h4>User Context</h4>
-            <dl class="meta">
-              <div><dt>User ID</dt><dd id="user-id"></dd></div>
-              <div><dt>Username</dt><dd id="user-name"></dd></div>
-              <div><dt>Role</dt><dd id="user-role"></dd></div>
-              <div><dt>Status</dt><dd id="user-status"></dd></div>
-            </dl>
-          </article>
-
-          <article class="panel">
-            <h4>Session Context</h4>
-            <dl class="meta">
-              <div><dt>Session ID</dt><dd id="session-id"></dd></div>
-              <div><dt>Expires At</dt><dd id="session-expiry"></dd></div>
-            </dl>
-          </article>
-        </div>
+        <section id="dashboard-section" class="view-panel"></section>
+        <section id="overview-section" class="view-panel hidden"></section>
+        <section id="tsd-section" class="view-panel hidden"></section>
+        <section id="cameras-section" class="view-panel hidden"></section>
+        <section id="layout-section" class="view-panel hidden"></section>
+        <section id="mappings-section" class="view-panel hidden"></section>
+        <section id="mode-section" class="view-panel hidden"></section>
+        <section id="readiness-section" class="view-panel hidden"></section>
+        <section id="logs-section" class="view-panel hidden"></section>
       </section>
     </section>
   </main>

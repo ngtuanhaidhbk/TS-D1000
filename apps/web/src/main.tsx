@@ -7,8 +7,15 @@ import { AuthProvider } from './shared/providers/auth-provider';
 import { ProtectedRoute } from './shared/router/protected-route';
 import { RoleRoute } from './shared/router/role-route';
 import { AdminPage } from './views/admin-page';
+import { CameraConfigPage } from './views/camera-config-page';
+import { ConfigOverviewPage } from './views/config-overview-page';
 import { DashboardPage } from './views/dashboard-page';
+import { LayoutMapPage } from './views/layout-map-page';
 import { LoginPage } from './views/login-page';
+import { MappingsPage } from './views/mappings-page';
+import { ModeConfigPage } from './views/mode-config-page';
+import { ReadinessCheckPage } from './views/readiness-check-page';
+import { TsdConfigPage } from './views/tsd-config-page';
 import { UnauthorizedPage } from './views/unauthorized-page';
 import './styles.css';
 
@@ -32,6 +39,34 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <DashboardPage />,
+      },
+      {
+        path: 'config',
+        element: <ConfigOverviewPage />,
+      },
+      {
+        path: 'config/tsd',
+        element: <TsdConfigPage />,
+      },
+      {
+        path: 'config/cameras',
+        element: <CameraConfigPage />,
+      },
+      {
+        path: 'config/layout',
+        element: <LayoutMapPage />,
+      },
+      {
+        path: 'config/mappings',
+        element: <MappingsPage />,
+      },
+      {
+        path: 'config/mode',
+        element: <ModeConfigPage />,
+      },
+      {
+        path: 'config/readiness',
+        element: <ReadinessCheckPage />,
       },
       {
         path: 'admin-only',

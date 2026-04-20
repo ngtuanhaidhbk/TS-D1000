@@ -29,14 +29,13 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
-.shell {
-  min-height: 100vh;
-}
-
+.shell,
 .view {
   min-height: 100vh;
 }
@@ -46,8 +45,8 @@ input {
 }
 
 .login-card {
-  width: min(440px, calc(100vw - 32px));
-  margin: 10vh auto;
+  width: min(520px, calc(100vw - 32px));
+  margin: 8vh auto;
   padding: 32px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -57,7 +56,10 @@ input {
 }
 
 .brand,
-.sidebar-brand {
+.sidebar-brand,
+.section-header,
+.button-row,
+.choice-row {
   display: flex;
   gap: 14px;
   align-items: center;
@@ -79,7 +81,9 @@ input {
 .field-error,
 .alert,
 .meta dt,
-.meta dd {
+.meta dd,
+.muted-text,
+.read-only-text {
   margin: 0;
 }
 
@@ -112,8 +116,10 @@ input {
   color: var(--muted);
 }
 
-.field input {
-  height: 44px;
+.field input,
+.field select,
+.field textarea {
+  min-height: 44px;
   border: 1px solid rgba(18, 37, 31, 0.16);
   border-radius: 10px;
   padding: 0 14px;
@@ -121,7 +127,15 @@ input {
   outline: none;
 }
 
-.field input:focus {
+.field textarea {
+  min-height: 96px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
   border-color: var(--focus);
   box-shadow: 0 0 0 3px rgba(43, 127, 255, 0.16);
 }
@@ -141,6 +155,7 @@ input {
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+  padding: 10px 16px;
 }
 
 .button:hover {
@@ -150,7 +165,7 @@ input {
 .button.primary {
   width: 100%;
   margin-top: 10px;
-  height: 46px;
+  min-height: 46px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -162,6 +177,15 @@ input {
 .button.primary:disabled {
   opacity: 0.75;
   cursor: progress;
+}
+
+.button.secondary {
+  color: #fff;
+  background: #4f7468;
+}
+
+.button.secondary:hover {
+  background: #3e5f55;
 }
 
 .button.danger {
@@ -208,7 +232,8 @@ input {
   border: 1px dashed rgba(31, 122, 90, 0.2);
 }
 
-.seed-box code {
+.seed-box code,
+.meta dd {
   font-family: Consolas, monospace;
 }
 
@@ -232,6 +257,8 @@ input {
 
 .nav-item {
   display: block;
+  width: 100%;
+  text-align: left;
   padding: 12px 14px;
   border-radius: 12px;
   color: var(--text);
@@ -242,6 +269,10 @@ input {
 .nav-item.active,
 .nav-item:hover {
   background: rgba(31, 122, 90, 0.1);
+}
+
+.nav-button {
+  border: 0;
 }
 
 .content {
@@ -272,11 +303,19 @@ input {
   border: 1px solid var(--line);
 }
 
-.grid {
+.grid,
+.hero-row {
   display: grid;
   gap: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   margin-top: 24px;
+}
+
+.hero-row {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .panel {
@@ -303,9 +342,98 @@ input {
   font-size: 0.84rem;
 }
 
-.meta dd {
-  font-family: Consolas, monospace;
-  word-break: break-word;
+.status-pill,
+.muted-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.status-manual,
+.status-warning,
+.status-partial {
+  background: rgba(201, 135, 20, 0.14);
+  color: #9c6813;
+}
+
+.status-automatic {
+  background: rgba(49, 101, 195, 0.14);
+  color: #275ec4;
+}
+
+.status-success,
+.status-passed,
+.status-active {
+  background: rgba(31, 122, 90, 0.14);
+  color: var(--primary-dark);
+}
+
+.status-failed,
+.status-inactive,
+.status-offline {
+  background: rgba(176, 68, 68, 0.14);
+  color: var(--danger-dark);
+}
+
+.muted-badge {
+  background: rgba(18, 37, 31, 0.08);
+  color: var(--muted);
+}
+
+.plain-list {
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.stack-form,
+.stack-block {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.button-row {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
+.read-only-text,
+.muted-text {
+  color: var(--muted);
+}
+
+.choice-row {
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.choice-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(18, 37, 31, 0.08);
+  text-align: left;
+  vertical-align: top;
 }
 
 @media (max-width: 900px) {
