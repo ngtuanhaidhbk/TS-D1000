@@ -15,6 +15,10 @@ import { LoginPage } from './views/login-page';
 import { MappingsPage } from './views/mappings-page';
 import { ModeConfigPage } from './views/mode-config-page';
 import { ReadinessCheckPage } from './views/readiness-check-page';
+import { RuntimeCameraViewPage } from './views/runtime-camera-view-page';
+import { RuntimeManualControlPage } from './views/runtime-manual-control-page';
+import { RuntimeMapViewPage } from './views/runtime-map-view-page';
+import { RuntimeMonitorPage } from './views/runtime-monitor-page';
 import { TsdConfigPage } from './views/tsd-config-page';
 import { UnauthorizedPage } from './views/unauthorized-page';
 import './styles.css';
@@ -39,6 +43,22 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <DashboardPage />,
+      },
+      {
+        path: 'runtime/map',
+        element: <RuntimeMapViewPage />,
+      },
+      {
+        path: 'runtime/cameras',
+        element: <RuntimeCameraViewPage />,
+      },
+      {
+        path: 'runtime/manual-control',
+        element: <RuntimeManualControlPage />,
+      },
+      {
+        path: 'runtime/monitor',
+        element: <RuntimeMonitorPage />,
       },
       {
         path: 'config',

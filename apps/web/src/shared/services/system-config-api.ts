@@ -62,7 +62,7 @@ export const systemConfigApi = {
   createCamera(
     payload: {
       name: string;
-      protocol: 'ONVIF' | 'VISCA';
+      protocol: 'ONVIF' | 'VISCA' | 'AXIS_VAPIX' | 'VENDOR_API';
       ipAddress: string;
       port?: number;
       username?: string;
@@ -79,7 +79,7 @@ export const systemConfigApi = {
     id: string,
     payload: {
       name: string;
-      protocol: 'ONVIF' | 'VISCA';
+      protocol: 'ONVIF' | 'VISCA' | 'AXIS_VAPIX' | 'VENDOR_API';
       ipAddress: string;
       port?: number;
       username?: string;
@@ -99,8 +99,28 @@ export const systemConfigApi = {
     return apiClient.post<{
       result: 'SUCCESS' | 'PARTIAL' | 'FAILED';
       testedAt: string;
-      capabilities: { ptz: boolean; preset: boolean; stream: boolean };
+      capabilities: { ptz: boolean; preset: boolean; stream: boolean; manualControl: boolean; positionQuery: boolean };
     }>(`/config/cameras/${id}/test`, undefined, token);
+  },
+  getCameraCapabilities(id: string, token: string) {
+    return apiClient.get<{
+      cameraId: string;
+      canStream: boolean;
+      canPtz: boolean;
+      canPreset: boolean;
+      supportsManualControl: boolean;
+      supportsPositionQuery: boolean;
+    }>(`/config/cameras/${id}/capabilities`, token);
+  },
+  detectCameraCapabilities(id: string, token: string) {
+    return apiClient.post<{
+      cameraId: string;
+      canStream: boolean;
+      canPtz: boolean;
+      canPreset: boolean;
+      supportsManualControl: boolean;
+      supportsPositionQuery: boolean;
+    }>(`/config/cameras/${id}/capabilities/detect`, undefined, token);
   },
   listPresets(id: string, token: string) {
     return apiClient.get<{ items: CameraPreset[] }>(`/config/cameras/${id}/presets`, token);
@@ -118,6 +138,9 @@ export const systemConfigApi = {
     token: string,
   ) {
     return apiClient.put<CameraPreset>(`/config/presets/${presetId}`, payload, token);
+  },
+  deletePreset(presetId: string, token: string) {
+    return apiClient.del<{ id: string }>(`/config/presets/${presetId}`, token);
   },
   getLayout(token: string) {
     return apiClient.get<Layout>('/config/layout', token);

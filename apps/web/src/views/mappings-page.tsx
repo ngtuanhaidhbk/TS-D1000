@@ -179,7 +179,7 @@ export function MappingsPage() {
             <input onChange={(event) => setSearch(event.target.value)} value={search} />
           </label>
           <label className="field field-inline">
-            <span>Camera</span>
+            <span>Camera Filter</span>
             <select onChange={(event) => setCameraFilter(event.target.value)} value={cameraFilter}>
               <option value="">All</option>
               {cameras.map((camera) => (

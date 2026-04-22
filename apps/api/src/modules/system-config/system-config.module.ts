@@ -46,5 +46,14 @@ import {
     OperationModeService,
     SystemReadinessService,
   ],
+  exports: [
+    RoomsRepository,
+    TsdUnitsRepository,
+    CamerasRepository,
+    CameraPresetsRepository,
+    MicCameraMappingsRepository,
+    CameraIntegrationService,
+    SystemConfigAuditService,
+  ],
 })
 export class SystemConfigModule {}

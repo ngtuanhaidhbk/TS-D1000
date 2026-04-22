@@ -56,7 +56,7 @@ export type PaginatedResponse<T> = {
 export type Camera = {
   id: string;
   name: string;
-  protocol: 'ONVIF' | 'VISCA';
+  protocol: 'ONVIF' | 'VISCA' | 'AXIS_VAPIX' | 'VENDOR_API';
   ipAddress: string;
   port: number | null;
   rtspUrl: string | null;
@@ -67,6 +67,8 @@ export type Camera = {
     ptz: boolean;
     preset: boolean;
     stream: boolean;
+    manualControl: boolean;
+    positionQuery: boolean;
   };
   lastTestResult: 'SUCCESS' | 'PARTIAL' | 'FAILED' | null;
   lastTestAt: string | null;

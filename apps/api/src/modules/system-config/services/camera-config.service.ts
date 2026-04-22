@@ -47,6 +47,14 @@ export class CameraConfigService {
     if (query.protocol) {
       items = items.filter((item) => item.protocol === query.protocol);
     }
+    if (query.testResult) {
+      const testResult = query.testResult.trim().toUpperCase();
+      if (testResult === 'UNTESTED') {
+        items = items.filter((item) => item.lastTestResult === null);
+      } else {
+        items = items.filter((item) => item.lastTestResult === testResult);
+      }
+    }
 
     return paginateAndFilter(items.map((item) => this.toCameraResponse(item)), {
       page: query.page ? Number(query.page) : 1,
@@ -91,6 +99,8 @@ export class CameraConfigService {
       capabilityPtz: false,
       capabilityPreset: false,
       capabilityStream: false,
+      capabilityManualControl: false,
+      capabilityPositionQuery: false,
       lastTestResult: null,
       lastTestAt: null,
       createdAt: now,
@@ -166,6 +176,8 @@ export class CameraConfigService {
         capabilityPtz: result.capabilities.ptz,
         capabilityPreset: result.capabilities.preset,
         capabilityStream: result.capabilities.stream,
+        capabilityManualControl: result.capabilities.manualControl,
+        capabilityPositionQuery: result.capabilities.positionQuery,
         updatedAt: nowIso(),
       });
       this.auditService.record('TEST_CAMERA', actor!.id, 'CAMERA', updated.id);
@@ -176,12 +188,43 @@ export class CameraConfigService {
           ptz: updated.capabilityPtz,
           preset: updated.capabilityPreset,
           stream: updated.capabilityStream,
+          manualControl: updated.capabilityManualControl,
+          positionQuery: updated.capabilityPositionQuery,
         },
       };
     } catch (error) {
       this.logger.error('Camera connection test failed');
       throw error;
     }
+  }
+
+  getCapabilities(id: string) {
+    const camera = this.mustFindCamera(id);
+    return {
+      cameraId: camera.id,
+      canStream: camera.capabilityStream,
+      canPtz: camera.capabilityPtz,
+      canPreset: camera.capabilityPreset,
+      supportsManualControl: camera.capabilityManualControl,
+      supportsPositionQuery: camera.capabilityPositionQuery,
+    };
+  }
+
+  detectCapabilities(id: string, actor?: CurrentUser) {
+    requireAdmin(actor);
+    const camera = this.mustFindCamera(id);
+    const result = this.cameraIntegrationService.testConnection(camera);
+    const updated = this.camerasRepository.save({
+      ...camera,
+      capabilityPtz: result.capabilities.ptz,
+      capabilityPreset: result.capabilities.preset,
+      capabilityStream: result.capabilities.stream,
+      capabilityManualControl: result.capabilities.manualControl,
+      capabilityPositionQuery: result.capabilities.positionQuery,
+      updatedAt: nowIso(),
+    });
+    this.auditService.record('DETECT_CAMERA_CAPABILITIES', actor!.id, 'CAMERA', updated.id);
+    return this.getCapabilities(updated.id);
   }
 
   listPresets(cameraId: string) {
@@ -238,6 +281,21 @@ export class CameraConfigService {
     return this.toPresetResponse(updated);
   }
 
+  deletePreset(id: string, actor?: CurrentUser) {
+    requireAdmin(actor);
+    const preset = this.cameraPresetsRepository.findById(id);
+    if (!preset) {
+      throw new AppException('PRESET_NOT_FOUND', 'Preset not found', 404);
+    }
+    if (this.mappingsRepository.findActiveByPresetId(preset.id).length > 0) {
+      throw new AppException('PRESET_ALREADY_IN_USE', 'Preset is referenced by active mappings', 422);
+    }
+
+    this.cameraPresetsRepository.deleteById(preset.id);
+    this.auditService.record('DELETE_PRESET', actor!.id, 'CAMERA_PRESET', preset.id);
+    return { id: preset.id };
+  }
+
   private mustFindCamera(id: string) {
     const camera = this.camerasRepository.findById(id);
     if (!camera) {
@@ -261,6 +319,8 @@ export class CameraConfigService {
         ptz: camera.capabilityPtz,
         preset: camera.capabilityPreset,
         stream: camera.capabilityStream,
+        manualControl: camera.capabilityManualControl,
+        positionQuery: camera.capabilityPositionQuery,
       },
       lastTestResult: camera.lastTestResult,
       lastTestAt: camera.lastTestAt,

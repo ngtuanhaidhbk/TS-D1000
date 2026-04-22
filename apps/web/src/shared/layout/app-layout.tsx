@@ -11,14 +11,26 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">TS-D1000</div>
+        <div className="brand">Control Desk</div>
         <nav className="nav">
           <NavLink to="/" className="nav-link">
             Dashboard
           </NavLink>
-          <span className="nav-link nav-link-muted">Map View</span>
-          <span className="nav-link nav-link-muted">Camera View</span>
-          <span className="nav-link nav-link-muted">Manual Control</span>
+          <div className="nav-section">
+            <span className="nav-section-title">Runtime</span>
+            <NavLink to="/runtime/map" className="nav-link">
+              Map View
+            </NavLink>
+            <NavLink to="/runtime/cameras" className="nav-link">
+              Camera View
+            </NavLink>
+            <NavLink to="/runtime/manual-control" className="nav-link">
+              Manual Control
+            </NavLink>
+            <NavLink to="/runtime/monitor" className="nav-link">
+              Runtime Monitor
+            </NavLink>
+          </div>
           <div className="nav-section">
             <span className="nav-section-title">System Configuration</span>
             <NavLink to="/config" className="nav-link">

@@ -1,0 +1,1499 @@
+openapi: 3.0.3
+info:
+  title: CRUD System Configuration API
+  version: 1.0.0
+  description: API contract for CRUD System Configuration module.
+servers:
+  - url: /api/v1
+tags:
+  - name: System Configuration Overview
+  - name: TS-D1000 Configuration
+  - name: Camera Configuration
+  - name: Camera Preset Configuration
+  - name: Layout & Map Configuration
+  - name: Mic-Camera Mapping Configuration
+  - name: Operation Mode Configuration
+  - name: Configuration Testing & Readiness
+security:
+  - bearerAuth: []
+paths:
+  /config/overview:
+    get:
+      tags: [System Configuration Overview]
+      summary: Get system configuration overview
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Overview returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /config/tsd:
+    post:
+      tags: [TS-D1000 Configuration]
+      summary: Create TS-D1000 configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTsdConfigRequest'
+      responses:
+        '200':
+          description: Configuration created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TsdConfigResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /config/tsd/current:
+    get:
+      tags: [TS-D1000 Configuration]
+      summary: Get active TS-D1000 configuration
+      responses:
+        '200':
+          description: Current config returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TsdCurrentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /config/tsd/{id}:
+    put:
+      tags: [TS-D1000 Configuration]
+      summary: Update TS-D1000 configuration
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTsdConfigRequest'
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TsdConfigResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /config/tsd/{id}/deactivate:
+    patch:
+      tags: [TS-D1000 Configuration]
+      summary: Deactivate TS-D1000 configuration
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivateRequest'
+      responses:
+        '200':
+          description: Configuration deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TsdDeactivateResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /config/tsd/{id}/sync-units:
+    post:
+      tags: [TS-D1000 Configuration]
+      summary: Sync TS-D units
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Sync summary returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncUnitsResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /config/tsd/{id}/units:
+    get:
+      tags: [TS-D1000 Configuration]
+      summary: List synced units
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - name: deviceType
+          in: query
+          schema:
+            $ref: '#/components/schemas/DeviceType'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Units listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TsdUnitListResponse'
+  /config/tsd/{id}/test:
+    post:
+      tags: [Configuration Testing & Readiness]
+      summary: Test TS-D1000 connection
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Test result returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TsdTestResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /config/cameras:
+    get:
+      tags: [Camera Configuration]
+      summary: List cameras
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/CameraStatus'
+        - name: protocol
+          in: query
+          schema:
+            $ref: '#/components/schemas/CameraProtocol'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Camera list returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraListResponse'
+    post:
+      tags: [Camera Configuration]
+      summary: Create camera
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCameraRequest'
+      responses:
+        '200':
+          description: Camera created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraDetailResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /config/cameras/{id}:
+    get:
+      tags: [Camera Configuration]
+      summary: Get camera detail
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Camera detail returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Camera Configuration]
+      summary: Update camera
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCameraRequest'
+      responses:
+        '200':
+          description: Camera updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraDetailResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /config/cameras/{id}/deactivate:
+    patch:
+      tags: [Camera Configuration]
+      summary: Deactivate camera
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivateRequest'
+      responses:
+        '200':
+          description: Camera deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /config/cameras/{id}/test:
+    post:
+      tags: [Configuration Testing & Readiness]
+      summary: Test camera connection
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Test result returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraTestResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /config/cameras/{id}/presets:
+    get:
+      tags: [Camera Preset Configuration]
+      summary: List camera presets
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Presets listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresetListResponse'
+    post:
+      tags: [Camera Preset Configuration]
+      summary: Create camera preset
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePresetRequest'
+      responses:
+        '200':
+          description: Preset created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresetResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /config/presets/{id}:
+    put:
+      tags: [Camera Preset Configuration]
+      summary: Update preset
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePresetRequest'
+      responses:
+        '200':
+          description: Preset updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresetResponse'
+    delete:
+      tags: [Camera Preset Configuration]
+      summary: Delete preset
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Preset deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePresetResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /config/layout/current:
+    get:
+      tags: [Layout & Map Configuration]
+      summary: Get active layout
+      responses:
+        '200':
+          description: Layout returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutCurrentResponse'
+  /config/layout:
+    post:
+      tags: [Layout & Map Configuration]
+      summary: Upload layout
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Layout uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutCurrentResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /config/layout/{id}/replace:
+    put:
+      tags: [Layout & Map Configuration]
+      summary: Replace layout
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Layout replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutCurrentResponse'
+  /config/layout/devices:
+    get:
+      tags: [Layout & Map Configuration]
+      summary: List layout devices
+      responses:
+        '200':
+          description: Layout devices returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutDeviceListResponse'
+    put:
+      tags: [Layout & Map Configuration]
+      summary: Save layout device positions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveLayoutDevicesRequest'
+      responses:
+        '200':
+          description: Positions saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutDeviceListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /config/layout/annotations:
+    get:
+      tags: [Layout & Map Configuration]
+      summary: List annotations
+      responses:
+        '200':
+          description: Annotation list returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationListResponse'
+    post:
+      tags: [Layout & Map Configuration]
+      summary: Create annotation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAnnotationRequest'
+      responses:
+        '200':
+          description: Annotation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationResponse'
+  /config/layout/annotations/{id}:
+    put:
+      tags: [Layout & Map Configuration]
+      summary: Update annotation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAnnotationRequest'
+      responses:
+        '200':
+          description: Annotation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationResponse'
+  /config/mappings:
+    get:
+      tags: [Mic-Camera Mapping Configuration]
+      summary: List mappings
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - name: cameraId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: deviceType
+          in: query
+          schema:
+            $ref: '#/components/schemas/DeviceType'
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Mapping list returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingListResponse'
+    post:
+      tags: [Mic-Camera Mapping Configuration]
+      summary: Create mapping
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMappingRequest'
+      responses:
+        '200':
+          description: Mapping created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /config/mappings/{id}:
+    put:
+      tags: [Mic-Camera Mapping Configuration]
+      summary: Update mapping
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMappingRequest'
+      responses:
+        '200':
+          description: Mapping updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingResponse'
+  /config/mappings/{id}/deactivate:
+    patch:
+      tags: [Mic-Camera Mapping Configuration]
+      summary: Deactivate mapping
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Mapping deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /config/mode:
+    get:
+      tags: [Operation Mode Configuration]
+      summary: Get operation mode
+      responses:
+        '200':
+          description: Mode returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModeResponse'
+    put:
+      tags: [Operation Mode Configuration]
+      summary: Update operation mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateModeRequest'
+      responses:
+        '200':
+          description: Mode updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModeResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /config/readiness/check:
+    post:
+      tags: [Configuration Testing & Readiness]
+      summary: Run readiness check
+      responses:
+        '200':
+          description: Readiness result returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+    SortBy:
+      name: sortBy
+      in: query
+      schema:
+        type: string
+    SortOrder:
+      name: sortOrder
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    UnprocessableEntity:
+      description: Business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    BadGateway:
+      description: Integration failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ServiceUnavailable:
+      description: Service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    InternalError:
+      description: Internal error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    UserRole:
+      type: string
+      enum: [ADMIN, OPERATOR]
+    OperationMode:
+      type: string
+      enum: [MANUAL, AUTOMATIC]
+    LayoutFileType:
+      type: string
+      enum: [PDF, JPG, JPEG]
+    DeviceType:
+      type: string
+      enum: [CHAIRMAN, DELEGATE]
+    CameraProtocol:
+      type: string
+      enum: [ONVIF, VISCA]
+    CameraStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, OFFLINE]
+    TsdConfigStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+    ConnectionTestResult:
+      type: string
+      enum: [SUCCESS, PARTIAL, FAILED]
+    ReadinessStatus:
+      type: string
+      enum: [PASSED, WARNING, FAILED]
+    LayoutRefType:
+      type: string
+      enum: [TSD_UNIT, CAMERA]
+    ErrorObject:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          nullable: true
+          type: array
+          items:
+            type: object
+      required: [code, message]
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+      required: [success, error]
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+      required: [page, pageSize, total, totalPages]
+    GenericSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+      required: [success, data]
+    RoomSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        operationMode:
+          $ref: '#/components/schemas/OperationMode'
+    OverviewData:
+      type: object
+      properties:
+        room:
+          $ref: '#/components/schemas/RoomSummary'
+        tsdConnection:
+          type: object
+          properties:
+            configured:
+              type: boolean
+            status:
+              $ref: '#/components/schemas/TsdConfigStatus'
+            lastTestResult:
+              allOf:
+                - $ref: '#/components/schemas/ConnectionTestResult'
+              nullable: true
+            lastTestAt:
+              type: string
+              format: date-time
+              nullable: true
+        layout:
+          type: object
+          properties:
+            configured:
+              type: boolean
+            fileType:
+              allOf:
+                - $ref: '#/components/schemas/LayoutFileType'
+              nullable: true
+        cameraSummary:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+        mappingSummary:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+    OverviewResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/OverviewData'
+      required: [success, data]
+    CreateTsdConfigRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        sseEndpoint:
+          type: string
+      required: [baseUrl]
+    UpdateTsdConfigRequest:
+      $ref: '#/components/schemas/CreateTsdConfigRequest'
+    TsdConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        roomId:
+          type: string
+          format: uuid
+        baseUrl:
+          type: string
+        username:
+          type: string
+          nullable: true
+        sseEndpoint:
+          type: string
+        status:
+          $ref: '#/components/schemas/TsdConfigStatus'
+        lastTestResult:
+          allOf:
+            - $ref: '#/components/schemas/ConnectionTestResult'
+          nullable: true
+        lastTestAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    TsdConfigResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/TsdConfig'
+      required: [success, data]
+    TsdCurrentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/TsdConfig'
+      required: [success]
+    DeactivateRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+    TsdDeactivateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              $ref: '#/components/schemas/TsdConfigStatus'
+            updatedAt:
+              type: string
+              format: date-time
+    SyncUnitItem:
+      type: object
+      properties:
+        externalUnitId:
+          type: string
+        deviceType:
+          $ref: '#/components/schemas/DeviceType'
+        status:
+          type: string
+          enum: [CREATED, UPDATED, SKIPPED]
+    SyncUnitsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            synced:
+              type: integer
+            created:
+              type: integer
+            updated:
+              type: integer
+            skipped:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/SyncUnitItem'
+    TsdUnit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        externalUnitId:
+          type: string
+        unitName:
+          type: string
+          nullable: true
+        deviceType:
+          $ref: '#/components/schemas/DeviceType'
+        runtimeState:
+          type: string
+        isConnected:
+          type: boolean
+    TsdUnitListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/TsdUnit'
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+    TsdTestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            result:
+              $ref: '#/components/schemas/ConnectionTestResult'
+            testedAt:
+              type: string
+              format: date-time
+    CameraCapabilities:
+      type: object
+      properties:
+        ptz:
+          type: boolean
+        preset:
+          type: boolean
+        stream:
+          type: boolean
+    CreateCameraRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        protocol:
+          $ref: '#/components/schemas/CameraProtocol'
+        ipAddress:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+        password:
+          type: string
+        rtspUrl:
+          type: string
+        vendor:
+          type: string
+        model:
+          type: string
+      required: [name, protocol, ipAddress]
+    UpdateCameraRequest:
+      $ref: '#/components/schemas/CreateCameraRequest'
+    CameraSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        protocol:
+          $ref: '#/components/schemas/CameraProtocol'
+        ipAddress:
+          type: string
+        port:
+          type: integer
+          nullable: true
+        status:
+          $ref: '#/components/schemas/CameraStatus'
+        capabilities:
+          $ref: '#/components/schemas/CameraCapabilities'
+        lastTestResult:
+          allOf:
+            - $ref: '#/components/schemas/ConnectionTestResult'
+          nullable: true
+        lastTestAt:
+          type: string
+          format: date-time
+          nullable: true
+    CameraListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/CameraSummary'
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+    CameraDetail:
+      allOf:
+        - $ref: '#/components/schemas/CameraSummary'
+        - type: object
+          properties:
+            roomId:
+              type: string
+              format: uuid
+            username:
+              type: string
+              nullable: true
+            rtspUrl:
+              type: string
+              nullable: true
+            vendor:
+              type: string
+              nullable: true
+            model:
+              type: string
+              nullable: true
+    CameraDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CameraDetail'
+    CameraTestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            result:
+              $ref: '#/components/schemas/ConnectionTestResult'
+            testedAt:
+              type: string
+              format: date-time
+            capabilities:
+              $ref: '#/components/schemas/CameraCapabilities'
+    CreatePresetRequest:
+      type: object
+      properties:
+        presetCode:
+          type: string
+        presetName:
+          type: string
+          nullable: true
+      required: [presetCode]
+    UpdatePresetRequest:
+      $ref: '#/components/schemas/CreatePresetRequest'
+    Preset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        presetCode:
+          type: string
+        presetName:
+          type: string
+          nullable: true
+    PresetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Preset'
+    PresetListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Preset'
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+    DeletePresetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            deleted:
+              type: boolean
+    Layout:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        roomId:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+        filePath:
+          type: string
+        fileType:
+          $ref: '#/components/schemas/LayoutFileType'
+        isActive:
+          type: boolean
+    LayoutCurrentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Layout'
+    LayoutDevice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        refType:
+          $ref: '#/components/schemas/LayoutRefType'
+        refId:
+          type: string
+          format: uuid
+        posX:
+          type: number
+        posY:
+          type: number
+        iconLabel:
+          type: string
+          nullable: true
+    SaveLayoutDevicesRequest:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            type: object
+            properties:
+              refType:
+                $ref: '#/components/schemas/LayoutRefType'
+              refId:
+                type: string
+                format: uuid
+              posX:
+                type: number
+                minimum: 0
+                maximum: 1
+              posY:
+                type: number
+                minimum: 0
+                maximum: 1
+              iconLabel:
+                type: string
+            required: [refType, refId, posX, posY]
+      required: [devices]
+    LayoutDeviceListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/LayoutDevice'
+    Annotation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        text:
+          type: string
+        posX:
+          type: number
+        posY:
+          type: number
+    CreateAnnotationRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        posX:
+          type: number
+          minimum: 0
+          maximum: 1
+        posY:
+          type: number
+          minimum: 0
+          maximum: 1
+      required: [text, posX, posY]
+    UpdateAnnotationRequest:
+      $ref: '#/components/schemas/CreateAnnotationRequest'
+    AnnotationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Annotation'
+    AnnotationListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Annotation'
+    CreateMappingRequest:
+      type: object
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        presetId:
+          type: string
+          format: uuid
+      required: [unitId, cameraId, presetId]
+    UpdateMappingRequest:
+      type: object
+      properties:
+        cameraId:
+          type: string
+          format: uuid
+        presetId:
+          type: string
+          format: uuid
+        isActive:
+          type: boolean
+      required: [cameraId, presetId, isActive]
+    Mapping:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        unit:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            externalUnitId:
+              type: string
+            unitName:
+              type: string
+              nullable: true
+            deviceType:
+              $ref: '#/components/schemas/DeviceType'
+        camera:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+        preset:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            presetCode:
+              type: string
+            presetName:
+              type: string
+              nullable: true
+        isActive:
+          type: boolean
+    MappingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Mapping'
+    MappingListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Mapping'
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+    ModeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            roomId:
+              type: string
+              format: uuid
+            mode:
+              $ref: '#/components/schemas/OperationMode'
+    UpdateModeRequest:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/OperationMode'
+      required: [mode]
+    ReadinessItem:
+      type: object
+      properties:
+        category:
+          type: string
+        status:
+          $ref: '#/components/schemas/ReadinessStatus'
+        message:
+          type: string
+    ReadinessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            overallStatus:
+              $ref: '#/components/schemas/ReadinessStatus'
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReadinessItem'

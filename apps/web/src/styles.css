@@ -89,6 +89,14 @@ body {
   color: #8b2e2e;
 }
 
+.warning-banner {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(214, 149, 43, 0.14);
+  color: #7b4b00;
+}
+
 .auth-loading {
   min-height: 100vh;
   display: grid;
@@ -448,6 +456,66 @@ body {
 
 .dialog-actions .button {
   margin-top: 0;
+}
+
+.pill-row {
+  display: inline-flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.stack-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(12, 41, 31, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.stack-actions {
+  display: inline-flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(12, 41, 31, 0.12);
+  margin: 18px 0;
+}
+
+.meta-list {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.meta-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.meta-list dt {
+  color: rgba(12, 41, 31, 0.64);
+  font-size: 0.85rem;
+}
+
+.meta-list dd {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.code-block {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(12, 41, 31, 0.12);
+  background: rgba(12, 41, 31, 0.04);
+  overflow: auto;
 }
 
 @media (max-width: 800px) {

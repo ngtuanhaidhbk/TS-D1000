@@ -21,6 +21,12 @@ $Script:LayoutPath = Join-Path $Script:DataDir "layout.json"
 $Script:LayoutDevicesPath = Join-Path $Script:DataDir "layout-devices.json"
 $Script:LayoutAnnotationsPath = Join-Path $Script:DataDir "layout-annotations.json"
 $Script:MappingsPath = Join-Path $Script:DataDir "mic-camera-mappings.json"
+$Script:RuntimeRoomStatePath = Join-Path $Script:DataDir "runtime-room-state.json"
+$Script:RuntimeUnitsStatePath = Join-Path $Script:DataDir "runtime-units-state.json"
+$Script:SpeakingRequestsPath = Join-Path $Script:DataDir "speaking-requests.json"
+$Script:RuntimeEventsPath = Join-Path $Script:DataDir "runtime-events.json"
+$Script:RuntimeCameraLogsPath = Join-Path $Script:DataDir "runtime-camera-logs.json"
+$Script:RuntimeWorkerPidPath = Join-Path $Script:DataDir "runtime-worker.json"
 $Script:TokenTtlMinutes = 480
 
 function Ensure-Directory([string]$Path) {
@@ -283,7 +289,11 @@ function Initialize-Data {
       $Script:PresetsPath,
       $Script:LayoutDevicesPath,
       $Script:LayoutAnnotationsPath,
-      $Script:MappingsPath
+      $Script:MappingsPath,
+      $Script:RuntimeUnitsStatePath,
+      $Script:SpeakingRequestsPath,
+      $Script:RuntimeEventsPath,
+      $Script:RuntimeCameraLogsPath
     )) {
     if (-not (Test-Path -LiteralPath $path)) {
       Write-JsonArray $path @()
@@ -296,6 +306,24 @@ function Initialize-Data {
 
   if (-not (Test-Path -LiteralPath $Script:LayoutPath)) {
     Write-JsonObject $Script:LayoutPath $null
+  }
+
+  if (-not (Test-Path -LiteralPath $Script:RuntimeRoomStatePath)) {
+    $room = Read-JsonObject $Script:RoomPath
+    $now = Get-NowUtcString
+    Write-JsonObject $Script:RuntimeRoomStatePath ([pscustomobject][ordered]@{
+      room_id = if ($null -ne $room) { $room.id } else { "room-001" }
+      operation_mode = if ($null -ne $room) { $room.operation_mode } else { "MANUAL" }
+      active_speakers = @()
+      pending_requests = @()
+      current_camera_target = $null
+      sse_status = "DISCONNECTED"
+      updated_at = $now
+    })
+  }
+
+  if (-not (Test-Path -LiteralPath $Script:RuntimeWorkerPidPath)) {
+    Write-JsonObject $Script:RuntimeWorkerPidPath $null
   }
 
   [void](Get-JwtSecret)
@@ -569,6 +597,107 @@ function Get-Mappings {
 
 function Save-Mappings([object[]]$Items) {
   Write-JsonArray $Script:MappingsPath $Items
+}
+
+function Get-RuntimeRoomState {
+  $state = Read-JsonObject $Script:RuntimeRoomStatePath
+  if ($null -eq $state) {
+    Initialize-Data
+    $state = Read-JsonObject $Script:RuntimeRoomStatePath
+  }
+  return $state
+}
+
+function Save-RuntimeRoomState($State) {
+  $State.updated_at = Get-NowUtcString
+  Write-JsonObject $Script:RuntimeRoomStatePath $State
+}
+
+function Get-RuntimeUnitsState {
+  return Read-JsonArray $Script:RuntimeUnitsStatePath
+}
+
+function Save-RuntimeUnitsState([object[]]$Items) {
+  Write-JsonArray $Script:RuntimeUnitsStatePath $Items
+}
+
+function Get-SpeakingRequests {
+  return Read-JsonArray $Script:SpeakingRequestsPath
+}
+
+function Save-SpeakingRequests([object[]]$Items) {
+  Write-JsonArray $Script:SpeakingRequestsPath $Items
+}
+
+function Get-RuntimeEvents {
+  return Read-JsonArray $Script:RuntimeEventsPath
+}
+
+function Save-RuntimeEvents([object[]]$Items) {
+  Write-JsonArray $Script:RuntimeEventsPath $Items
+}
+
+function Get-RuntimeCameraLogs {
+  return Read-JsonArray $Script:RuntimeCameraLogsPath
+}
+
+function Save-RuntimeCameraLogs([object[]]$Items) {
+  Write-JsonArray $Script:RuntimeCameraLogsPath $Items
+}
+
+function Get-RuntimeWorkerInfo {
+  return Read-JsonObject $Script:RuntimeWorkerPidPath
+}
+
+function Save-RuntimeWorkerInfo($Info) {
+  Write-JsonObject $Script:RuntimeWorkerPidPath $Info
+}
+
+function Get-CurrentOperationMode {
+  $room = Get-Room
+  return [string]$room.operation_mode
+}
+
+function Sync-RuntimeRoomStateMode {
+  $state = Get-RuntimeRoomState
+  $mode = Get-CurrentOperationMode
+  if ($state.operation_mode -ne $mode) {
+    $state.operation_mode = $mode
+    Save-RuntimeRoomState $state
+  }
+}
+
+function Compute-RuntimeSnapshot {
+  Sync-RuntimeRoomStateMode
+  $state = Get-RuntimeRoomState
+  $requests = @(Get-SpeakingRequests)
+  $pending = @($requests | Where-Object { $_.status -eq "PENDING" })
+  $unitStates = @(Get-RuntimeUnitsState)
+  $speaking = @($unitStates | Where-Object { $_.state -eq "SPEAKING" })
+
+  # Keep room snapshot fields consistent even if worker only updates partial data.
+  $state.pending_requests = @($pending | ForEach-Object { $_.id })
+  $state.active_speakers = @($speaking | ForEach-Object { $_.unit_id })
+  Save-RuntimeRoomState $state
+
+  $units = @{}
+  foreach ($item in $unitStates) {
+    if ($null -ne $item -and -not [string]::IsNullOrWhiteSpace([string]$item.unit_id)) {
+      $units[[string]$item.unit_id] = @{
+        state = [string]$item.state
+        lastEventAt = $item.last_event_at
+      }
+    }
+  }
+
+  return @{
+    operationMode = [string]$state.operation_mode
+    sseStatus = [string]$state.sse_status
+    activeSpeakers = @($state.active_speakers)
+    pendingRequests = @($state.pending_requests)
+    currentCameraTarget = $state.current_camera_target
+    units = $units
+  }
 }
 
 function Get-PaginatedResult([object[]]$Items, [int]$Page = 1, [int]$PageSize = 20) {
@@ -1773,6 +1902,292 @@ function Validate-MappingRelations([string]$UnitId, [string]$CameraId, [string]$
   }
 }
 
+function Convert-TsdConfigToResponse($Config) {
+  if ($null -eq $Config) {
+    return $null
+  }
+
+  $status = if ($null -ne $Config.status -and -not [string]::IsNullOrWhiteSpace([string]$Config.status)) { [string]$Config.status } else { "ACTIVE" }
+  return @{
+    id = $Config.id
+    roomId = $Config.room_id
+    baseUrl = $Config.base_url
+    username = $Config.username
+    sseEndpoint = $Config.sse_endpoint
+    status = $status
+    lastTestResult = $Config.last_test_result
+    lastTestAt = $Config.last_test_at
+    createdAt = $Config.created_at
+    updatedAt = $Config.updated_at
+  }
+}
+
+function Convert-LayoutToResponse($Layout) {
+  if ($null -eq $Layout) {
+    return $null
+  }
+
+  return @{
+    id = $Layout.id
+    roomId = $Layout.room_id
+    fileName = $Layout.file_name
+    filePath = $Layout.file_path
+    fileType = $Layout.file_type
+    isActive = if ($null -ne $Layout.is_active) { [bool]$Layout.is_active } else { $true }
+    width = $Layout.width
+    height = $Layout.height
+    createdAt = $Layout.created_at
+    updatedAt = $Layout.updated_at
+  }
+}
+
+function Handle-ConfigOverviewCrud([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+
+  $room = Get-Room
+  $config = Get-TsdConfig
+  $isTsdConfigured = $null -ne $config -and (([string]$config.status) -ne "INACTIVE")
+  $layout = Get-Layout
+  $cameras = @(Get-Cameras)
+  $mappings = @(Get-Mappings)
+  $activeCameras = @($cameras | Where-Object { $_.status -eq "ACTIVE" })
+  $activeMappings = @($mappings | Where-Object { [bool]$_.is_active })
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      room = @{
+        id = $room.id
+        name = $room.name
+        operationMode = $room.operation_mode
+      }
+      tsdConnection = @{
+        configured = $isTsdConfigured
+        status = if ($isTsdConfigured) { if ($config.status) { $config.status } else { "ACTIVE" } } else { "INACTIVE" }
+        lastTestResult = if ($isTsdConfigured) { $config.last_test_result } else { $null }
+        lastTestAt = if ($isTsdConfigured) { $config.last_test_at } else { $null }
+      }
+      layout = @{
+        configured = ($null -ne $layout)
+        fileType = if ($null -ne $layout) { $layout.file_type } else { $null }
+      }
+      cameraSummary = @{
+        total = $cameras.Count
+        active = $activeCameras.Count
+      }
+      mappingSummary = @{
+        total = $mappings.Count
+        active = $activeMappings.Count
+      }
+    }
+  }
+}
+
+function Protect-ConfigSecret([string]$PlainText) {
+  if ([string]::IsNullOrWhiteSpace($PlainText)) {
+    return $null
+  }
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($PlainText)
+  return [Convert]::ToBase64String($bytes)
+}
+
+function Handle-GetCurrentTsdConfig([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+
+  $config = Get-TsdConfig
+  $isActive = $null -ne $config -and (([string]$config.status) -ne "INACTIVE")
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = if ($isActive) { Convert-TsdConfigToResponse $config } else { $null }
+  }
+}
+
+function Handle-CreateCrudTsdConfig([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $payload = Read-JsonPayload $Context
+  $baseUrl = if ($null -ne $payload.baseUrl) { ([string]$payload.baseUrl).Trim() } else { "" }
+  $sseEndpoint = if ($null -ne $payload.sseEndpoint) { ([string]$payload.sseEndpoint).Trim() } else { "/api/event" }
+
+  if ([string]::IsNullOrWhiteSpace($baseUrl)) {
+    Send-Error $Context.Response 400 "VALIDATION_ERROR" "Base URL is required"
+    return
+  }
+  if ($null -ne $payload.sseEndpoint -and [string]::IsNullOrWhiteSpace($sseEndpoint)) {
+    Send-Error $Context.Response 400 "VALIDATION_ERROR" "SSE endpoint must not be empty"
+    return
+  }
+
+  $existing = Get-TsdConfig
+  if ($null -ne $existing -and (([string]$existing.status) -ne "INACTIVE")) {
+    Send-Error $Context.Response 409 "TSD_CONFIG_ALREADY_EXISTS" "An active TS-D1000 configuration already exists"
+    return
+  }
+
+  $room = Get-Room
+  $now = Get-NowUtcString
+  $config = [pscustomobject]@{
+    id = New-Id
+    room_id = $room.id
+    base_url = $baseUrl
+    username = if ($null -ne $payload.username -and -not [string]::IsNullOrWhiteSpace([string]$payload.username)) { ([string]$payload.username).Trim() } else { $null }
+    password_encrypted = Protect-ConfigSecret ([string]$payload.password)
+    sse_endpoint = if ([string]::IsNullOrWhiteSpace($sseEndpoint)) { "/api/event" } else { $sseEndpoint }
+    status = "ACTIVE"
+    last_test_result = $null
+    last_test_at = $null
+    created_at = $now
+    updated_at = $now
+  }
+
+  Save-TsdConfig $config
+  Add-AuditLog ([guid]$auth.user.id) "CREATE_TSD_CONFIG" "TSD_CONFIG" $config.id "SUCCESS" @{ roomId = $room.id }
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = Convert-TsdConfigToResponse $config
+  }
+}
+
+function Handle-UpdateCrudTsdConfig([System.Net.HttpListenerContext]$Context, [string]$ConfigId) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $config = Get-TsdConfig
+  if ($null -eq $config -or $config.id -ne $ConfigId) {
+    Send-Error $Context.Response 404 "TSD_CONFIG_NOT_FOUND" "TS-D1000 configuration not found"
+    return
+  }
+
+  $payload = Read-JsonPayload $Context
+  $baseUrl = if ($null -ne $payload.baseUrl) { ([string]$payload.baseUrl).Trim() } else { "" }
+  $sseEndpoint = if ($null -ne $payload.sseEndpoint) { ([string]$payload.sseEndpoint).Trim() } else { "/api/event" }
+
+  if ([string]::IsNullOrWhiteSpace($baseUrl)) {
+    Send-Error $Context.Response 400 "VALIDATION_ERROR" "Base URL is required"
+    return
+  }
+  if ($null -ne $payload.sseEndpoint -and [string]::IsNullOrWhiteSpace($sseEndpoint)) {
+    Send-Error $Context.Response 400 "VALIDATION_ERROR" "SSE endpoint must not be empty"
+    return
+  }
+
+  $config.base_url = $baseUrl
+  $config.username = if ($null -ne $payload.username -and -not [string]::IsNullOrWhiteSpace([string]$payload.username)) { ([string]$payload.username).Trim() } else { $null }
+  if ($null -ne $payload.password -and -not [string]::IsNullOrWhiteSpace([string]$payload.password)) {
+    $config.password_encrypted = Protect-ConfigSecret ([string]$payload.password)
+  }
+  $config.sse_endpoint = if ([string]::IsNullOrWhiteSpace($sseEndpoint)) { "/api/event" } else { $sseEndpoint }
+  if ($null -eq $config.status -or [string]::IsNullOrWhiteSpace([string]$config.status)) {
+    $config.status = "ACTIVE"
+  }
+  $config.updated_at = Get-NowUtcString
+
+  Save-TsdConfig $config
+  Add-AuditLog ([guid]$auth.user.id) "UPDATE_TSD_CONFIG" "TSD_CONFIG" $config.id "SUCCESS" @{ roomId = $config.room_id }
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = Convert-TsdConfigToResponse $config
+  }
+}
+
+function Handle-DeactivateCrudTsdConfig([System.Net.HttpListenerContext]$Context, [string]$ConfigId) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $config = Get-TsdConfig
+  if ($null -eq $config -or $config.id -ne $ConfigId) {
+    Send-Error $Context.Response 404 "TSD_CONFIG_NOT_FOUND" "TS-D1000 configuration not found"
+    return
+  }
+
+  $status = if ($null -ne $config.status -and -not [string]::IsNullOrWhiteSpace([string]$config.status)) { [string]$config.status } else { "ACTIVE" }
+  if ($status -eq "INACTIVE") {
+    Send-Error $Context.Response 409 "INVALID_TSD_CONFIG_STATE" "TS-D1000 configuration is already inactive"
+    return
+  }
+
+  $config.status = "INACTIVE"
+  $config.updated_at = Get-NowUtcString
+  Save-TsdConfig $config
+  Add-AuditLog ([guid]$auth.user.id) "DEACTIVATE_TSD_CONFIG" "TSD_CONFIG" $config.id "SUCCESS" @{}
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      id = $config.id
+      status = $config.status
+      updatedAt = $config.updated_at
+    }
+  }
+}
+
+function Handle-GetCurrentLayout([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = Convert-LayoutToResponse (Get-Layout)
+  }
+}
+
+function Handle-DeletePreset([System.Net.HttpListenerContext]$Context, [string]$PresetId) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $presets = @(Get-Presets)
+  $preset = $presets | Where-Object { $_.id -eq $PresetId } | Select-Object -First 1
+  if ($null -eq $preset) {
+    Send-Error $Context.Response 404 "PRESET_NOT_FOUND" "Preset not found"
+    return
+  }
+
+  $activeMapping = Get-Mappings | Where-Object { $_.preset_id -eq $PresetId -and [bool]$_.is_active } | Select-Object -First 1
+  if ($null -ne $activeMapping) {
+    Send-Error $Context.Response 422 "PRESET_ALREADY_IN_USE" "This preset is used by active mappings and cannot be deleted."
+    return
+  }
+
+  $remaining = @($presets | Where-Object { $_.id -ne $PresetId })
+  Save-Presets $remaining
+  Add-AuditLog ([guid]$auth.user.id) "DELETE_PRESET" "CAMERA_PRESET" $PresetId "SUCCESS" @{}
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      id = $PresetId
+      deleted = $true
+    }
+  }
+}
+
+function Handle-DeactivateMapping([System.Net.HttpListenerContext]$Context, [string]$MappingId) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $mappings = @(Get-Mappings)
+  $mapping = $mappings | Where-Object { $_.id -eq $MappingId } | Select-Object -First 1
+  if ($null -eq $mapping) {
+    Send-Error $Context.Response 404 "MAPPING_NOT_FOUND" "Mapping not found"
+    return
+  }
+  if (-not [bool]$mapping.is_active) {
+    Send-Error $Context.Response 409 "INVALID_MAPPING_STATE" "Mapping is already inactive"
+    return
+  }
+
+  $mapping.is_active = $false
+  $mapping.updated_at = Get-NowUtcString
+  Save-Mappings $mappings
+  Add-AuditLog ([guid]$auth.user.id) "DEACTIVATE_MAPPING" "MIC_CAMERA_MAPPING" $mapping.id "SUCCESS" @{}
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = New-MappingResponse $mapping
+  }
+}
+
 function Handle-CreateMapping([System.Net.HttpListenerContext]$Context) {
   $auth = Get-AuthOrSend $Context
   if (-not (Require-AdminOrSend $Context $auth)) { return }
@@ -1854,13 +2269,70 @@ function Handle-UpdateMode([System.Net.HttpListenerContext]$Context) {
   Handle-GetMode $Context
 }
 
+function Handle-GetRuntimeMode([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+  $room = Get-Room
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      roomId = $room.id
+      mode = $room.operation_mode
+    }
+  }
+}
+
+function Handle-UpdateRuntimeMode([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $payload = Read-JsonPayload $Context
+  if ($null -eq $payload -or @("MANUAL", "AUTOMATIC") -notcontains [string]$payload.mode) {
+    Send-Error $Context.Response 400 "VALIDATION_ERROR" "Mode is required"
+    return
+  }
+
+  $room = Get-Room
+  $room.operation_mode = [string]$payload.mode
+  Save-Room $room
+  Add-AuditLog ([guid]$auth.user.id) "UPDATE_MODE" "ROOM" $room.id "SUCCESS" @{ mode = $room.operation_mode }
+  Handle-GetRuntimeMode $Context
+}
+
+function Handle-GetRuntimeModeSwitchImpact([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $snap = Compute-RuntimeSnapshot
+  $hasActiveSpeakers = (@($snap.activeSpeakers)).Count -gt 0
+  $hasPendingRequests = (@($snap.pendingRequests)).Count -gt 0
+  $warning = if ($hasActiveSpeakers -or $hasPendingRequests) {
+    "There are active speakers or pending requests. Switching mode may affect the current speaking session."
+  } else {
+    $null
+  }
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      hasActiveSpeakers = $hasActiveSpeakers
+      hasPendingRequests = $hasPendingRequests
+      warningMessage = $warning
+    }
+  }
+}
+
 function Handle-ReadinessCheck([System.Net.HttpListenerContext]$Context) {
   $auth = Get-AuthOrSend $Context
   if (-not (Require-AdminOrSend $Context $auth)) { return }
   $room = Get-Room
   $config = Get-TsdConfig
+  if ($null -ne $config -and ([string]$config.status) -eq "INACTIVE") {
+    $config = $null
+  }
   $units = @(Get-TsdUnits)
   $cameras = @(Get-Cameras)
+  $activeCameras = @($cameras | Where-Object { $_.status -eq "ACTIVE" })
   $layout = Get-Layout
   $mappings = @(Get-Mappings | Where-Object { $_.is_active })
 
@@ -1873,10 +2345,10 @@ function Handle-ReadinessCheck([System.Net.HttpListenerContext]$Context) {
     $items += @{ category = "TSD"; status = "WARNING"; message = "TS-D1000 connection is configured but should be tested again" }
   }
 
-  if ($cameras.Count -gt 0) {
-    $items += @{ category = "CAMERA"; status = "PASSED"; message = "$($cameras.Count) camera(s) configured" }
+  if ($activeCameras.Count -gt 0) {
+    $items += @{ category = "CAMERA"; status = "PASSED"; message = "$($activeCameras.Count) active camera(s) configured" }
   } else {
-    $items += @{ category = "CAMERA"; status = "FAILED"; message = "No camera configured" }
+    $items += @{ category = "CAMERA"; status = "FAILED"; message = "No active camera configured" }
   }
 
   if ($null -ne $layout) {
@@ -1913,6 +2385,301 @@ function Handle-ReadinessCheck([System.Net.HttpListenerContext]$Context) {
   }
 }
 
+function Parse-QueryString([string]$Query) {
+  $result = @{}
+  if ([string]::IsNullOrWhiteSpace($Query)) {
+    return $result
+  }
+
+  $trimmed = $Query.TrimStart("?")
+  if ([string]::IsNullOrWhiteSpace($trimmed)) {
+    return $result
+  }
+
+  foreach ($pair in $trimmed.Split("&")) {
+    if ([string]::IsNullOrWhiteSpace($pair)) { continue }
+    $parts = $pair.Split("=", 2)
+    $key = [uri]::UnescapeDataString($parts[0])
+    $value = if ($parts.Length -gt 1) { [uri]::UnescapeDataString($parts[1]) } else { "" }
+    if (-not [string]::IsNullOrWhiteSpace($key)) {
+      $result[$key] = $value
+    }
+  }
+
+  return $result
+}
+
+function Handle-GetRuntimeSnapshot([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = (Compute-RuntimeSnapshot)
+  }
+}
+
+function Handle-ListRuntimeRequests([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+
+  $query = Parse-QueryString $Context.Request.Url.Query
+  $status = if ($query.ContainsKey("status")) { ([string]$query["status"]).Trim() } else { "" }
+  $pageRaw = if ($query.ContainsKey("page")) { ([string]$query["page"]).Trim() } else { "" }
+  $pageSizeRaw = if ($query.ContainsKey("pageSize")) { ([string]$query["pageSize"]).Trim() } else { "" }
+
+  $page = 1
+  $pageSize = 20
+  if (-not [string]::IsNullOrWhiteSpace($pageRaw)) {
+    if (-not [int]::TryParse($pageRaw, [ref]$page) -or $page -lt 1) {
+      Send-Error $Context.Response 400 "VALIDATION_ERROR" "page must be >= 1"
+      return
+    }
+  }
+  if (-not [string]::IsNullOrWhiteSpace($pageSizeRaw)) {
+    if (-not [int]::TryParse($pageSizeRaw, [ref]$pageSize) -or $pageSize -lt 1 -or $pageSize -gt 100) {
+      Send-Error $Context.Response 400 "VALIDATION_ERROR" "pageSize must be between 1 and 100"
+      return
+    }
+  }
+
+  $requests = @(Get-SpeakingRequests)
+  if (-not [string]::IsNullOrWhiteSpace($status)) {
+    $valid = @("PENDING", "APPROVED", "REJECTED", "CANCELLED")
+    if (-not ($valid -contains $status)) {
+      Send-Error $Context.Response 400 "VALIDATION_ERROR" "status is invalid"
+      return
+    }
+    $requests = @($requests | Where-Object { $_.status -eq $status })
+  }
+
+  $requests = @(
+    $requests |
+      Sort-Object -Property @{ Expression = { if ($null -ne $_.created_at) { $_.created_at } else { "" } } }, @{ Expression = { $_.id } }
+  )
+
+  $pageResult = Get-PaginatedResult $requests $page $pageSize
+  $items = @(
+    $pageResult.items | ForEach-Object {
+      @{
+        id = $_.id
+        unitId = $_.unit_id
+        status = $_.status
+        createdAt = $_.created_at
+        updatedAt = $_.updated_at
+        handledBy = $_.handled_by
+      }
+    }
+  )
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      items = $items
+      pagination = $pageResult.pagination
+    }
+  }
+}
+
+function Upsert-RuntimeUnitState([string]$UnitId, [string]$State) {
+  $now = Get-NowUtcString
+  $items = @(Get-RuntimeUnitsState)
+  $existing = $items | Where-Object { $_.unit_id -eq $UnitId } | Select-Object -First 1
+  if ($null -eq $existing) {
+    $items = @(
+      $items + [pscustomobject]@{
+        id = New-Id
+        unit_id = $UnitId
+        state = $State
+        last_event_at = $now
+      }
+    )
+  }
+  else {
+    foreach ($item in $items) {
+      if ($item.unit_id -eq $UnitId) {
+        $item.state = $State
+        $item.last_event_at = $now
+      }
+    }
+  }
+  Save-RuntimeUnitsState $items
+}
+
+function Handle-ApproveRuntimeRequest([System.Net.HttpListenerContext]$Context, [string]$RequestId) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+
+  if ((Get-CurrentOperationMode) -ne "MANUAL") {
+    Send-Error $Context.Response 422 "MANUAL_MODE_REQUIRED" "Manual mode is required"
+    return
+  }
+
+  $requests = @(Get-SpeakingRequests)
+  $req = $requests | Where-Object { $_.id -eq $RequestId } | Select-Object -First 1
+  if ($null -eq $req) {
+    Send-Error $Context.Response 404 "REQUEST_NOT_FOUND" "Request not found"
+    return
+  }
+  if ($req.status -ne "PENDING") {
+    Send-Error $Context.Response 422 "REQUEST_NOT_PENDING" "Request is not in pending state"
+    return
+  }
+
+  $now = Get-NowUtcString
+  $req.status = "APPROVED"
+  $req.handled_by = $auth.user.id
+  $req.updated_at = $now
+
+  $updated = @(
+    foreach ($item in $requests) {
+      if ($item.id -eq $RequestId) { $req } else { $item }
+    }
+  )
+  Save-SpeakingRequests $updated
+  Add-AuditLog ([guid]$auth.user.id) "APPROVE_SPEAKING_REQUEST" "SPEAKING_REQUEST" $RequestId "SUCCESS" @{}
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      requestId = $RequestId
+      status = "APPROVED"
+      actedAt = $now
+    }
+  }
+}
+
+function Handle-RejectRuntimeRequest([System.Net.HttpListenerContext]$Context, [string]$RequestId) {
+  $auth = Get-AuthOrSend $Context
+  if ($null -eq $auth) { return }
+
+  if ((Get-CurrentOperationMode) -ne "MANUAL") {
+    Send-Error $Context.Response 422 "MANUAL_MODE_REQUIRED" "Manual mode is required"
+    return
+  }
+
+  $requests = @(Get-SpeakingRequests)
+  $req = $requests | Where-Object { $_.id -eq $RequestId } | Select-Object -First 1
+  if ($null -eq $req) {
+    Send-Error $Context.Response 404 "REQUEST_NOT_FOUND" "Request not found"
+    return
+  }
+  if ($req.status -ne "PENDING") {
+    Send-Error $Context.Response 422 "REQUEST_NOT_PENDING" "Request is not in pending state"
+    return
+  }
+
+  $now = Get-NowUtcString
+  $req.status = "REJECTED"
+  $req.handled_by = $auth.user.id
+  $req.updated_at = $now
+
+  $updated = @(
+    foreach ($item in $requests) {
+      if ($item.id -eq $RequestId) { $req } else { $item }
+    }
+  )
+  Save-SpeakingRequests $updated
+  Upsert-RuntimeUnitState $req.unit_id "IDLE"
+  Add-AuditLog ([guid]$auth.user.id) "REJECT_SPEAKING_REQUEST" "SPEAKING_REQUEST" $RequestId "SUCCESS" @{}
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      requestId = $RequestId
+      status = "REJECTED"
+      actedAt = $now
+    }
+  }
+}
+
+function Test-WorkerRunning([int]$Pid) {
+  if ($Pid -le 0) { return $false }
+  try {
+    [void](Get-Process -Id $Pid -ErrorAction Stop)
+    return $true
+  }
+  catch {
+    return $false
+  }
+}
+
+function Handle-InternalRuntimeStart([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $info = Get-RuntimeWorkerInfo
+  if ($null -ne $info -and $null -ne $info.pid -and (Test-WorkerRunning ([int]$info.pid))) {
+    $snapshot = Compute-RuntimeSnapshot
+    Send-Json $Context.Response 200 @{
+      success = $true
+      data = @{
+        started = $true
+        sseStatus = $snapshot.sseStatus
+      }
+    }
+    return
+  }
+
+  $psExe = Join-Path $env:SystemRoot "System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+  $workerPath = Join-Path $PSScriptRoot "runtime-worker.ps1"
+  if (-not (Test-Path -LiteralPath $workerPath)) {
+    Send-Error $Context.Response 500 "SYSTEM_ERROR" "Runtime worker script is missing"
+    return
+  }
+
+  $stdout = Join-Path $Script:DataDir "runtime-worker.log"
+  $stderr = Join-Path $Script:DataDir "runtime-worker.err.log"
+  $args = @(
+    "-NoLogo",
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", $workerPath,
+    "-RootDir", $Script:Root
+  )
+
+  $proc = Start-Process -FilePath $psExe -ArgumentList $args -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
+  Save-RuntimeWorkerInfo ([pscustomobject]@{
+    pid = $proc.Id
+    startedAt = Get-NowUtcString
+  })
+
+  $state = Get-RuntimeRoomState
+  $state.sse_status = "RECONNECTING"
+  Save-RuntimeRoomState $state
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      started = $true
+      sseStatus = $state.sse_status
+    }
+  }
+}
+
+function Handle-InternalRuntimeStop([System.Net.HttpListenerContext]$Context) {
+  $auth = Get-AuthOrSend $Context
+  if (-not (Require-AdminOrSend $Context $auth)) { return }
+
+  $info = Get-RuntimeWorkerInfo
+  if ($null -ne $info -and $null -ne $info.pid -and (Test-WorkerRunning ([int]$info.pid))) {
+    try { Stop-Process -Id ([int]$info.pid) -Force -ErrorAction Stop } catch { }
+  }
+
+  Save-RuntimeWorkerInfo $null
+  $state = Get-RuntimeRoomState
+  $state.sse_status = "DISCONNECTED"
+  Save-RuntimeRoomState $state
+
+  Send-Json $Context.Response 200 @{
+    success = $true
+    data = @{
+      stopped = $true
+      sseStatus = $state.sse_status
+    }
+  }
+}
+
 function Handle-Static([System.Net.HttpListenerContext]$Context) {
   $relativePath = $Context.Request.Url.AbsolutePath.TrimStart("/")
   if ([string]::IsNullOrWhiteSpace($relativePath)) {
@@ -1938,7 +2705,18 @@ function Handle-Static([System.Net.HttpListenerContext]$Context) {
 Initialize-Data
 
 $listener = [System.Net.HttpListener]::new()
-$listener.Prefixes.Add("http://localhost:$Port/")
+# Bind to both IPv4/IPv6 loopback variants to avoid "localhost -> ::1" connection refused issues.
+foreach ($prefix in @(
+    "http://localhost:$Port/",
+    "http://127.0.0.1:$Port/",
+    "http://[::1]:$Port/"
+  )) {
+  try {
+    $listener.Prefixes.Add($prefix)
+  } catch {
+    # Some environments don't support IPv6 prefix; best effort.
+  }
+}
 $listener.Start()
 
 Write-Host "TS-D1000 demo server is running at http://localhost:$Port/"
@@ -1958,10 +2736,12 @@ try {
       if ($method -eq "GET" -and $path -eq "/api/v1/auth/me") { Handle-AuthMe $context; continue }
       if ($method -eq "GET" -and $path -eq "/api/v1/health") { Handle-Health $context; continue }
 
-      if ($method -eq "GET" -and $path -eq "/api/v1/config/overview") { Handle-ConfigOverview $context; continue }
+      if ($method -eq "GET" -and $path -eq "/api/v1/config/overview") { Handle-ConfigOverviewCrud $context; continue }
+      if ($method -eq "GET" -and $path -eq "/api/v1/config/tsd/current") { Handle-GetCurrentTsdConfig $context; continue }
       if ($method -eq "GET" -and $path -eq "/api/v1/config/tsd") { Handle-GetTsdConfig $context; continue }
-      if ($method -eq "POST" -and $path -eq "/api/v1/config/tsd") { Handle-CreateTsdConfig $context; continue }
-      if ($method -eq "PUT" -and $path -match "^/api/v1/config/tsd/([^/]+)$") { Handle-UpdateTsdConfig $context $Matches[1]; continue }
+      if ($method -eq "POST" -and $path -eq "/api/v1/config/tsd") { Handle-CreateCrudTsdConfig $context; continue }
+      if ($method -eq "PUT" -and $path -match "^/api/v1/config/tsd/([^/]+)$") { Handle-UpdateCrudTsdConfig $context $Matches[1]; continue }
+      if ($method -eq "PATCH" -and $path -match "^/api/v1/config/tsd/([^/]+)/deactivate$") { Handle-DeactivateCrudTsdConfig $context $Matches[1]; continue }
       if ($method -eq "POST" -and $path -match "^/api/v1/config/tsd/([^/]+)/test$") { Handle-TestTsdConfig $context $Matches[1]; continue }
       if ($method -eq "POST" -and $path -match "^/api/v1/config/tsd/([^/]+)/sync-units$") { Handle-SyncTsdUnits $context $Matches[1]; continue }
       if ($method -eq "GET" -and $path -match "^/api/v1/config/tsd/([^/]+)/units$") { Handle-ListUnits $context $Matches[1]; continue }
@@ -1975,9 +2755,12 @@ try {
       if ($method -eq "GET" -and $path -match "^/api/v1/config/cameras/([^/]+)/presets$") { Handle-ListPresets $context $Matches[1]; continue }
       if ($method -eq "POST" -and $path -match "^/api/v1/config/cameras/([^/]+)/presets$") { Handle-CreatePreset $context $Matches[1]; continue }
       if ($method -eq "PUT" -and $path -match "^/api/v1/config/presets/([^/]+)$") { Handle-UpdatePreset $context $Matches[1]; continue }
+      if ($method -eq "DELETE" -and $path -match "^/api/v1/config/presets/([^/]+)$") { Handle-DeletePreset $context $Matches[1]; continue }
 
+      if ($method -eq "GET" -and $path -eq "/api/v1/config/layout/current") { Handle-GetCurrentLayout $context; continue }
       if ($method -eq "GET" -and $path -eq "/api/v1/config/layout") { Handle-GetLayout $context; continue }
       if ($method -eq "POST" -and $path -eq "/api/v1/config/layout") { Handle-UploadLayout $context; continue }
+      if ($method -eq "PUT" -and $path -match "^/api/v1/config/layout/([^/]+)/replace$") { Handle-UploadLayout $context; continue }
       if ($method -eq "GET" -and $path -eq "/api/v1/config/layout/devices") { Handle-ListLayoutDevices $context; continue }
       if ($method -eq "PUT" -and $path -eq "/api/v1/config/layout/devices") { Handle-SaveLayoutDevices $context; continue }
       if ($method -eq "GET" -and $path -eq "/api/v1/config/layout/annotations") { Handle-ListAnnotations $context; continue }
@@ -1987,10 +2770,23 @@ try {
       if ($method -eq "GET" -and $path -eq "/api/v1/config/mappings") { Handle-ListMappings $context; continue }
       if ($method -eq "POST" -and $path -eq "/api/v1/config/mappings") { Handle-CreateMapping $context; continue }
       if ($method -eq "PUT" -and $path -match "^/api/v1/config/mappings/([^/]+)$") { Handle-UpdateMapping $context $Matches[1]; continue }
+      if ($method -eq "PATCH" -and $path -match "^/api/v1/config/mappings/([^/]+)/deactivate$") { Handle-DeactivateMapping $context $Matches[1]; continue }
 
       if ($method -eq "GET" -and $path -eq "/api/v1/config/mode") { Handle-GetMode $context; continue }
       if ($method -eq "PUT" -and $path -eq "/api/v1/config/mode") { Handle-UpdateMode $context; continue }
       if ($method -eq "POST" -and $path -eq "/api/v1/config/readiness/check") { Handle-ReadinessCheck $context; continue }
+
+      if ($method -eq "GET" -and $path -eq "/api/v1/runtime/mode") { Handle-GetRuntimeMode $context; continue }
+      if ($method -eq "PUT" -and $path -eq "/api/v1/runtime/mode") { Handle-UpdateRuntimeMode $context; continue }
+      if ($method -eq "GET" -and $path -eq "/api/v1/runtime/mode/switch-impact") { Handle-GetRuntimeModeSwitchImpact $context; continue }
+
+      if ($method -eq "GET" -and $path -eq "/api/v1/runtime/snapshot") { Handle-GetRuntimeSnapshot $context; continue }
+      if ($method -eq "GET" -and $path -eq "/api/v1/runtime/requests") { Handle-ListRuntimeRequests $context; continue }
+      if ($method -eq "POST" -and $path -match "^/api/v1/runtime/requests/([^/]+)/approve$") { Handle-ApproveRuntimeRequest $context $Matches[1]; continue }
+      if ($method -eq "POST" -and $path -match "^/api/v1/runtime/requests/([^/]+)/reject$") { Handle-RejectRuntimeRequest $context $Matches[1]; continue }
+
+      if ($method -eq "POST" -and $path -eq "/internal/runtime/start") { Handle-InternalRuntimeStart $context; continue }
+      if ($method -eq "POST" -and $path -eq "/internal/runtime/stop") { Handle-InternalRuntimeStop $context; continue }
 
       Handle-Static $context
       continue

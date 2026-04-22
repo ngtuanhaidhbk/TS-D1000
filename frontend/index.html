@@ -58,6 +58,10 @@
         </div>
         <nav>
           <button class="nav-item nav-button active" data-view="dashboard" type="button">Dashboard</button>
+          <button class="nav-item nav-button" data-view="runtime-map" type="button">Map View</button>
+          <button class="nav-item nav-button" data-view="runtime-cameras" type="button">Camera View</button>
+          <button class="nav-item nav-button" data-view="runtime-manual" type="button">Manual Control</button>
+          <button class="nav-item nav-button" data-view="runtime-monitor" type="button">Runtime Monitor</button>
           <button class="nav-item nav-button" data-view="overview" type="button">Config Overview</button>
           <button class="nav-item nav-button" data-view="tsd" type="button">TS-D1000</button>
           <button class="nav-item nav-button" data-view="cameras" type="button">Cameras</button>
@@ -72,8 +76,12 @@
       <section class="content">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Authenticated session</p>
+            <p class="eyebrow" id="room-chip">Room</p>
             <h3 id="welcome-title">Dashboard</h3>
+            <div class="topbar-status">
+              <button id="mode-badge" class="status-pill badge-button hidden" type="button"></button>
+              <span id="sse-badge" class="status-pill hidden"></span>
+            </div>
           </div>
           <div class="user-chip">
             <span id="username-chip"></span>
@@ -85,6 +93,10 @@
         <div id="view-error" class="alert hidden" role="alert"></div>
 
         <section id="dashboard-section" class="view-panel"></section>
+        <section id="runtime-map-section" class="view-panel hidden"></section>
+        <section id="runtime-cameras-section" class="view-panel hidden"></section>
+        <section id="runtime-manual-section" class="view-panel hidden"></section>
+        <section id="runtime-monitor-section" class="view-panel hidden"></section>
         <section id="overview-section" class="view-panel hidden"></section>
         <section id="tsd-section" class="view-panel hidden"></section>
         <section id="cameras-section" class="view-panel hidden"></section>
@@ -97,6 +109,7 @@
     </section>
   </main>
 
+  <div id="modal-root"></div>
   <script src="/app.js"></script>
 </body>
 </html>

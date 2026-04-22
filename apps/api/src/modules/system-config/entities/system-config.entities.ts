@@ -24,6 +24,8 @@ export enum UnitRuntimeState {
 export enum CameraProtocol {
   ONVIF = 'ONVIF',
   VISCA = 'VISCA',
+  AXIS_VAPIX = 'AXIS_VAPIX',
+  VENDOR_API = 'VENDOR_API',
 }
 
 export enum CameraStatus {
@@ -100,6 +102,8 @@ export type CameraEntity = {
   capabilityPtz: boolean;
   capabilityPreset: boolean;
   capabilityStream: boolean;
+  capabilityManualControl: boolean;
+  capabilityPositionQuery: boolean;
   lastTestResult: ConnectionTestResult | null;
   lastTestAt: string | null;
   createdAt: string;

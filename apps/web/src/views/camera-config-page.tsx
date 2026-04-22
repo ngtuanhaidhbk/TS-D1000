@@ -8,7 +8,7 @@ import { formatDateTime, statusClassName } from './system-config-shared';
 
 type CameraFormState = {
   name: string;
-  protocol: 'ONVIF' | 'VISCA';
+  protocol: 'ONVIF' | 'VISCA' | 'AXIS_VAPIX' | 'VENDOR_API';
   ipAddress: string;
   port: string;
   username: string;
@@ -53,6 +53,7 @@ export function CameraConfigPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [protocolFilter, setProtocolFilter] = useState('');
+  const [testResultFilter, setTestResultFilter] = useState('');
   const [editingCameraId, setEditingCameraId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,7 +70,7 @@ export function CameraConfigPage() {
       return;
     }
     void loadCameras();
-  }, [token, search, statusFilter, protocolFilter]);
+  }, [token, search, statusFilter, protocolFilter, testResultFilter]);
 
   useEffect(() => {
     if (!token || !selectedCameraId) {
@@ -96,6 +97,9 @@ export function CameraConfigPage() {
       if (protocolFilter) {
         params.set('protocol', protocolFilter);
       }
+      if (testResultFilter) {
+        params.set('testResult', testResultFilter);
+      }
       const response = await systemConfigApi.listCameras(token, params);
       setCameras(response.items);
       setSelectedCameraId((current) => current ?? response.items[0]?.id ?? null);
@@ -115,6 +119,26 @@ export function CameraConfigPage() {
       setPresets(response.items);
     } catch (apiError) {
       setError(apiError instanceof ApiClientError ? apiError.message : 'Unable to load presets');
+    }
+  }
+
+  async function deletePreset(presetId: string) {
+    if (!token || !selectedCameraId) {
+      return;
+    }
+    const confirmed = window.confirm('Delete this preset? This cannot be undone.');
+    if (!confirmed) {
+      return;
+    }
+    setPresetSaving(true);
+    setError(null);
+    try {
+      await systemConfigApi.deletePreset(presetId, token);
+      await loadPresets(selectedCameraId);
+    } catch (apiError) {
+      setError(apiError instanceof ApiClientError ? apiError.message : 'Unable to delete preset');
+    } finally {
+      setPresetSaving(false);
     }
   }
 
@@ -198,6 +222,19 @@ export function CameraConfigPage() {
     }
   }
 
+  async function handleDetectCapabilities() {
+    if (!token || !selectedCamera) {
+      return;
+    }
+    setError(null);
+    try {
+      await systemConfigApi.detectCameraCapabilities(selectedCamera.id, token);
+      await loadCameras();
+    } catch (apiError) {
+      setError(apiError instanceof ApiClientError ? apiError.message : 'Unable to detect capabilities');
+    }
+  }
+
   async function handlePresetSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !selectedCamera) {
@@ -268,6 +305,18 @@ export function CameraConfigPage() {
               <option value="">All</option>
               <option value="ONVIF">ONVIF</option>
               <option value="VISCA">VISCA</option>
+              <option value="AXIS_VAPIX">AXIS VAPIX</option>
+              <option value="VENDOR_API">Vendor API</option>
+            </select>
+          </label>
+          <label className="field field-inline">
+            <span>Test result</span>
+            <select onChange={(event) => setTestResultFilter(event.target.value)} value={testResultFilter}>
+              <option value="">All</option>
+              <option value="UNTESTED">UNTESTED</option>
+              <option value="SUCCESS">SUCCESS</option>
+              <option value="PARTIAL">PARTIAL</option>
+              <option value="FAILED">FAILED</option>
             </select>
           </label>
         </div>
@@ -281,8 +330,10 @@ export function CameraConfigPage() {
                 <th>Name</th>
                 <th>Protocol</th>
                 <th>IP Address</th>
+                <th>Vendor / Model</th>
                 <th>Status</th>
                 <th>Capabilities</th>
+                <th>Last test</th>
               </tr>
             </thead>
             <tbody>
@@ -296,10 +347,22 @@ export function CameraConfigPage() {
                   <td>{camera.protocol}</td>
                   <td>{camera.ipAddress}{camera.port ? `:${camera.port}` : ''}</td>
                   <td>
+                    {(camera.vendor || camera.model)
+                      ? `${camera.vendor ?? 'Unknown'}${camera.model ? ` / ${camera.model}` : ''}`
+                      : 'Not set'}
+                  </td>
+                  <td>
                     <span className={statusClassName(camera.status)}>{camera.status}</span>
                   </td>
                   <td>
                     {camera.capabilities.ptz ? 'PTZ' : 'No PTZ'} / {camera.capabilities.preset ? 'Preset' : 'No preset'}
+                  </td>
+                  <td>
+                    {camera.lastTestResult ? (
+                      <span className={statusClassName(camera.lastTestResult)}>{camera.lastTestResult}</span>
+                    ) : (
+                      <span className="subtle-text">UNTESTED</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -335,8 +398,34 @@ export function CameraConfigPage() {
                   <dd>{formatDateTime(selectedCamera.lastTestAt)}</dd>
                 </div>
                 <div>
+                  <dt>Test result</dt>
+                  <dd>
+                    {selectedCamera.lastTestResult ? (
+                      <span className={statusClassName(selectedCamera.lastTestResult)}>{selectedCamera.lastTestResult}</span>
+                    ) : (
+                      'UNTESTED'
+                    )}
+                  </dd>
+                </div>
+                <div>
                   <dt>Stream</dt>
                   <dd>{selectedCamera.capabilities.stream ? 'Available' : 'Not detected'}</dd>
+                </div>
+                <div>
+                  <dt>PTZ</dt>
+                  <dd>{selectedCamera.capabilities.ptz ? 'Supported' : 'Unsupported'}</dd>
+                </div>
+                <div>
+                  <dt>Presets</dt>
+                  <dd>{selectedCamera.capabilities.preset ? 'Supported' : 'Unsupported'}</dd>
+                </div>
+                <div>
+                  <dt>Manual control</dt>
+                  <dd>{selectedCamera.capabilities.manualControl ? 'Supported' : 'Unsupported'}</dd>
+                </div>
+                <div>
+                  <dt>Position query</dt>
+                  <dd>{selectedCamera.capabilities.positionQuery ? 'Supported' : 'Unsupported'}</dd>
                 </div>
               </dl>
               {isAdmin ? (
@@ -346,6 +435,9 @@ export function CameraConfigPage() {
                   </button>
                   <button className="button button-secondary" onClick={handleTestCamera} type="button">
                     Test Camera
+                  </button>
+                  <button className="button button-secondary" onClick={handleDetectCapabilities} type="button">
+                    Detect Capability
                   </button>
                   <button className="button button-danger" onClick={handleDeactivateCamera} type="button">
                     Deactivate
@@ -367,6 +459,11 @@ export function CameraConfigPage() {
             <p className="subtle-text">Select a camera first.</p>
           ) : (
             <>
+              {!selectedCamera.capabilities.preset && selectedCamera.lastTestResult === 'SUCCESS' ? (
+                <div className="warning-banner">
+                  This camera does not support preset control. Preset actions are disabled.
+                </div>
+              ) : null}
               {presets.length === 0 ? <p className="subtle-text">No presets available for selected camera.</p> : null}
               <ul className="stack-list">
                 {presets.map((preset) => (
@@ -374,19 +471,29 @@ export function CameraConfigPage() {
                     <div className="card-heading">
                       <strong>{preset.presetCode}</strong>
                       {isAdmin ? (
-                        <button
-                          className="button button-secondary button-compact"
-                          onClick={() =>
-                            setPresetForm({
-                              id: preset.id,
-                              presetCode: preset.presetCode,
-                              presetName: preset.presetName ?? '',
-                            })
-                          }
-                          type="button"
-                        >
-                          Edit
-                        </button>
+                        <div className="stack-row">
+                          <button
+                            className="button button-secondary button-compact"
+                            onClick={() =>
+                              setPresetForm({
+                                id: preset.id,
+                                presetCode: preset.presetCode,
+                                presetName: preset.presetName ?? '',
+                              })
+                            }
+                            type="button"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="button button-danger button-compact"
+                            disabled={presetSaving}
+                            onClick={() => void deletePreset(preset.id)}
+                            type="button"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       ) : null}
                     </div>
                     <p className="subtle-text">{preset.presetName ?? 'Unnamed preset'}</p>
@@ -394,12 +501,16 @@ export function CameraConfigPage() {
                 ))}
               </ul>
 
-              {isAdmin ? (
-                <form className="form-grid compact-form" onSubmit={handlePresetSubmit}>
+                {isAdmin ? (
+                <form
+                  className="form-grid compact-form"
+                  onSubmit={handlePresetSubmit}
+                >
                   <label className="field">
                     <span>Preset Code</span>
                     <input
                       onChange={(event) => setPresetForm((value) => ({ ...value, presetCode: event.target.value }))}
+                      disabled={!selectedCamera.capabilities.preset && selectedCamera.lastTestResult === 'SUCCESS'}
                       value={presetForm.presetCode}
                     />
                   </label>
@@ -407,11 +518,18 @@ export function CameraConfigPage() {
                     <span>Preset Name</span>
                     <input
                       onChange={(event) => setPresetForm((value) => ({ ...value, presetName: event.target.value }))}
+                      disabled={!selectedCamera.capabilities.preset && selectedCamera.lastTestResult === 'SUCCESS'}
                       value={presetForm.presetName}
                     />
                   </label>
                   <div className="form-actions">
-                    <button className="button button-secondary" disabled={presetSaving} type="submit">
+                    <button
+                      className="button button-secondary"
+                      disabled={
+                        presetSaving || (!selectedCamera.capabilities.preset && selectedCamera.lastTestResult === 'SUCCESS')
+                      }
+                      type="submit"
+                    >
                       {presetSaving ? 'Saving...' : presetForm.id ? 'Update Preset' : 'Add Preset'}
                     </button>
                   </div>
@@ -434,12 +552,17 @@ export function CameraConfigPage() {
               <span>Protocol</span>
               <select
                 onChange={(event) =>
-                  setForm((value) => ({ ...value, protocol: event.target.value as 'ONVIF' | 'VISCA' }))
+                  setForm((value) => ({
+                    ...value,
+                    protocol: event.target.value as CameraFormState['protocol'],
+                  }))
                 }
                 value={form.protocol}
               >
                 <option value="ONVIF">ONVIF</option>
                 <option value="VISCA">VISCA</option>
+                <option value="AXIS_VAPIX">AXIS VAPIX</option>
+                <option value="VENDOR_API">Vendor API</option>
               </select>
             </label>
             <label className="field">

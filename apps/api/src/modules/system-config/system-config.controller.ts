@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -125,6 +126,17 @@ export class SystemConfigController {
     return this.cameraConfigService.testCamera(id, actor);
   }
 
+  @Get('cameras/:id/capabilities')
+  getCameraCapabilities(@Param('id') id: string) {
+    return this.cameraConfigService.getCapabilities(id);
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Post('cameras/:id/capabilities/detect')
+  detectCameraCapabilities(@Param('id') id: string, @CurrentUserDecorator() actor?: CurrentUser) {
+    return this.cameraConfigService.detectCapabilities(id, actor);
+  }
+
   @Get('cameras/:id/presets')
   listPresets(@Param('id') id: string) {
     return this.cameraConfigService.listPresets(id);
@@ -148,6 +160,12 @@ export class SystemConfigController {
     @CurrentUserDecorator() actor?: CurrentUser,
   ) {
     return this.cameraConfigService.updatePreset(id, payload, actor);
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Delete('presets/:id')
+  deletePreset(@Param('id') id: string, @CurrentUserDecorator() actor?: CurrentUser) {
+    return this.cameraConfigService.deletePreset(id, actor);
   }
 
   @Get('layout')

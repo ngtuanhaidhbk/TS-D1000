@@ -64,6 +64,8 @@ describe('CameraConfigService', () => {
         capabilityPtz: false,
         capabilityPreset: false,
         capabilityStream: false,
+        capabilityManualControl: false,
+        capabilityPositionQuery: false,
         lastTestResult: null,
         lastTestAt: null,
         createdAt: '2026-04-20T10:00:00.000Z',
@@ -108,6 +110,8 @@ describe('CameraConfigService', () => {
       capabilityPtz: true,
       capabilityPreset: true,
       capabilityStream: false,
+      capabilityManualControl: true,
+      capabilityPositionQuery: false,
       lastTestResult: null,
       lastTestAt: null,
       createdAt: '2026-04-20T10:00:00.000Z',
@@ -133,5 +137,50 @@ describe('CameraConfigService', () => {
         statusCode: 422,
       });
     }
+  });
+
+  it('blocks preset deletion when the preset is referenced by an active mapping', () => {
+    cameraPresetsRepository.save({
+      id: 'preset-1',
+      cameraId: 'camera-1',
+      presetCode: 'P01',
+      presetName: 'Delegate 01',
+      createdAt: '2026-04-20T10:00:00.000Z',
+      updatedAt: '2026-04-20T10:00:00.000Z',
+    });
+    mappingsRepository.save({
+      id: 'mapping-1',
+      roomId: 'room-001',
+      unitId: 'unit-1',
+      cameraId: 'camera-1',
+      presetId: 'preset-1',
+      isActive: true,
+      createdAt: '2026-04-20T10:00:00.000Z',
+      updatedAt: '2026-04-20T10:00:00.000Z',
+    });
+
+    try {
+      service.deletePreset('preset-1', actor);
+      fail('Expected deletePreset to throw');
+    } catch (error) {
+      expect(error).toMatchObject<AppException>({
+        code: 'PRESET_ALREADY_IN_USE',
+        statusCode: 422,
+      });
+    }
+  });
+
+  it('deletes presets when there is no active dependency', () => {
+    cameraPresetsRepository.save({
+      id: 'preset-2',
+      cameraId: 'camera-1',
+      presetCode: 'P02',
+      presetName: null,
+      createdAt: '2026-04-20T10:00:00.000Z',
+      updatedAt: '2026-04-20T10:00:00.000Z',
+    });
+
+    expect(service.deletePreset('preset-2', actor)).toEqual({ id: 'preset-2' });
+    expect(cameraPresetsRepository.findById('preset-2')).toBeNull();
   });
 });

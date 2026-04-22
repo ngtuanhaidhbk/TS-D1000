@@ -5,6 +5,16 @@ const state = {
   user: null,
   session: null,
   currentView: "dashboard",
+  runtimeSnapshot: null,
+  runtimeRequests: [],
+  runtimePollHandle: null,
+  runtimeMapFilters: {
+    showActiveSpeakersOnly: false,
+    showPendingRequests: true,
+    showCameras: true,
+  },
+  runtimeCameraGrid: 2,
+  runtimeSelectedDevice: null,
   overview: null,
   tsdConfig: null,
   units: [],
@@ -29,8 +39,16 @@ const logoutButton = document.getElementById("logout-button");
 const sessionMessage = document.getElementById("session-message");
 const viewError = document.getElementById("view-error");
 const welcomeTitle = document.getElementById("welcome-title");
+const roomChip = document.getElementById("room-chip");
+const modeBadgeButton = document.getElementById("mode-badge");
+const sseBadgeNode = document.getElementById("sse-badge");
+const modalRoot = document.getElementById("modal-root");
 const viewSections = {
   dashboard: document.getElementById("dashboard-section"),
+  "runtime-map": document.getElementById("runtime-map-section"),
+  "runtime-cameras": document.getElementById("runtime-cameras-section"),
+  "runtime-manual": document.getElementById("runtime-manual-section"),
+  "runtime-monitor": document.getElementById("runtime-monitor-section"),
   overview: document.getElementById("overview-section"),
   tsd: document.getElementById("tsd-section"),
   cameras: document.getElementById("cameras-section"),
@@ -144,12 +162,19 @@ function loadNavState() {
 }
 
 function showView(viewName) {
+  if (state.currentView !== viewName) {
+    stopRuntimePolling();
+  }
   state.currentView = viewName;
   Object.entries(viewSections).forEach(([key, section]) => {
     section.classList.toggle("hidden", key !== viewName);
   });
   const titles = {
     dashboard: "Dashboard",
+    "runtime-map": "Runtime Map View",
+    "runtime-cameras": "Runtime Camera View",
+    "runtime-manual": "Manual Control",
+    "runtime-monitor": "Runtime Monitor",
     overview: "System Configuration Overview",
     tsd: "TS-D1000 Configuration",
     cameras: "Camera Configuration",
@@ -161,6 +186,10 @@ function showView(viewName) {
   };
   welcomeTitle.textContent = titles[viewName] || "Dashboard";
   loadNavState();
+
+  if (viewName.startsWith("runtime-")) {
+    startRuntimePolling();
+  }
 }
 
 function renderAuthenticatedView() {
@@ -170,6 +199,7 @@ function renderAuthenticatedView() {
   document.getElementById("username-chip").textContent = state.user.username;
   document.getElementById("role-badge").textContent = `${state.user.role} access`;
 
+  renderTopbarStatus();
   showView(state.currentView);
 }
 
@@ -279,9 +309,11 @@ async function loadTsdData() {
   state.units = [];
   state.tsdConfig = null;
   try {
-    state.tsdConfig = await fetchJson("/api/v1/config/tsd", { method: "GET" });
-    const units = await fetchJson(`/api/v1/config/tsd/${state.tsdConfig.id}/units`, { method: "GET" });
-    state.units = units.items || [];
+    state.tsdConfig = await fetchJson("/api/v1/config/tsd/current", { method: "GET" });
+    if (state.tsdConfig?.id) {
+      const units = await fetchJson(`/api/v1/config/tsd/${state.tsdConfig.id}/units`, { method: "GET" });
+      state.units = units.items || [];
+    }
   } catch (error) {
     if (error.code !== "CONFIG_NOT_FOUND") {
       throw error;
@@ -304,13 +336,15 @@ async function loadLayoutData() {
   state.layoutDevices = [];
   state.layoutAnnotations = [];
   try {
-    state.layout = await fetchJson("/api/v1/config/layout", { method: "GET" });
-    const [devices, annotations] = await Promise.all([
-      fetchJson("/api/v1/config/layout/devices", { method: "GET" }),
-      fetchJson("/api/v1/config/layout/annotations", { method: "GET" }),
-    ]);
-    state.layoutDevices = devices.items || [];
-    state.layoutAnnotations = annotations.items || [];
+    state.layout = await fetchJson("/api/v1/config/layout/current", { method: "GET" });
+    if (state.layout?.id) {
+      const [devices, annotations] = await Promise.all([
+        fetchJson("/api/v1/config/layout/devices", { method: "GET" }),
+        fetchJson("/api/v1/config/layout/annotations", { method: "GET" }),
+      ]);
+      state.layoutDevices = devices.items || [];
+      state.layoutAnnotations = annotations.items || [];
+    }
   } catch (error) {
     if (error.code !== "LAYOUT_NOT_CONFIGURED") {
       throw error;
@@ -349,6 +383,8 @@ async function loadLogsData() {
 
 function renderAllViews() {
   renderDashboard();
+  renderRuntimeMap();
+  renderRuntimeCameras();
   renderOverview();
   renderTsd();
   renderCameras();
@@ -356,7 +392,33 @@ function renderAllViews() {
   renderMappings();
   renderMode();
   renderReadiness();
+  renderTopbarStatus();
   loadNavState();
+}
+
+function renderTopbarStatus() {
+  if (!roomChip) return;
+
+  const roomName = state.overview?.room?.name || "Room";
+  roomChip.textContent = roomName;
+
+  const snap = state.runtimeSnapshot;
+  const mode = snap?.operationMode || state.mode || "MANUAL";
+  const sse = snap?.sseStatus || "UNKNOWN";
+
+  if (modeBadgeButton) {
+    modeBadgeButton.className = `status-pill badge-button status-${String(mode).toLowerCase()}`;
+    modeBadgeButton.textContent = mode;
+    modeBadgeButton.classList.toggle("hidden", !mode);
+    modeBadgeButton.title = isAdmin() ? "Change mode" : "Mode (Admin only)";
+    modeBadgeButton.disabled = !isAdmin();
+  }
+
+  if (sseBadgeNode) {
+    sseBadgeNode.className = `status-pill status-${String(sse).toLowerCase()}`;
+    sseBadgeNode.textContent = sse;
+    sseBadgeNode.classList.toggle("hidden", !snap);
+  }
 }
 
 function renderDashboard() {
@@ -466,6 +528,7 @@ function renderTsd() {
               <button class="button secondary" type="submit">Save</button>
               <button id="tsd-test-button" class="button secondary" type="button" ${config ? "" : "disabled"}>Test Connection</button>
               <button id="tsd-sync-button" class="button secondary" type="button" ${config ? "" : "disabled"}>Sync Units</button>
+              <button id="tsd-deactivate-button" class="button danger" type="button" ${config ? "" : "disabled"}>Deactivate</button>
             </div>
           </form>` : `<p class="read-only-text">Operator can view TS-D1000 configuration only.</p>`}
       </article>
@@ -484,6 +547,7 @@ function renderTsd() {
     document.getElementById("tsd-form")?.addEventListener("submit", handleTsdSave);
     document.getElementById("tsd-test-button")?.addEventListener("click", handleTsdTest);
     document.getElementById("tsd-sync-button")?.addEventListener("click", handleTsdSync);
+    document.getElementById("tsd-deactivate-button")?.addEventListener("click", handleTsdDeactivate);
   }
 }
 
@@ -559,8 +623,8 @@ function renderCameras() {
       <h4>Presets</h4>
       ${selectedCamera ? selectedPresets.length ? `
         <table class="data-table">
-          <thead><tr><th>Camera</th><th>Preset Code</th><th>Preset Name</th></tr></thead>
-          <tbody>${selectedPresets.map((preset) => `<tr><td>${selectedCamera.name}</td><td>${preset.presetCode}</td><td>${preset.presetName || "Unnamed"}</td></tr>`).join("")}</tbody>
+          <thead><tr><th>Camera</th><th>Preset Code</th><th>Preset Name</th>${canEdit ? "<th>Actions</th>" : ""}</tr></thead>
+          <tbody>${selectedPresets.map((preset) => `<tr><td>${selectedCamera.name}</td><td>${preset.presetCode}</td><td>${preset.presetName || "Unnamed"}</td>${canEdit ? `<td><button class="button danger preset-delete-button" data-preset-id="${preset.id}" type="button">Delete</button></td>` : ""}</tr>`).join("")}</tbody>
         </table>` : "<p>No presets available for selected camera.</p>" : "<p>No camera configured.</p>"}
     </article>
   `;
@@ -574,6 +638,9 @@ function renderCameras() {
     document.getElementById("camera-test-button")?.addEventListener("click", handleCameraTest);
     document.getElementById("camera-deactivate-button")?.addEventListener("click", handleCameraDeactivate);
     document.getElementById("preset-form")?.addEventListener("submit", handlePresetSave);
+    document.querySelectorAll(".preset-delete-button").forEach((button) => {
+      button.addEventListener("click", () => handlePresetDelete(button.dataset.presetId));
+    });
   }
 }
 
@@ -656,8 +723,8 @@ function renderMappings() {
       <h4>Mappings</h4>
       ${state.mappings.length ? `
         <table class="data-table">
-          <thead><tr><th>Unit</th><th>Camera</th><th>Preset</th><th>Active</th></tr></thead>
-          <tbody>${state.mappings.map((mapping) => `<tr><td>${mapping.unit.externalUnitId}${mapping.unit.unitName ? ` - ${mapping.unit.unitName}` : ""}</td><td>${mapping.camera.name}</td><td>${mapping.preset.presetCode}</td><td>${statusBadge(mapping.isActive ? "ACTIVE" : "INACTIVE")}</td></tr>`).join("")}</tbody>
+          <thead><tr><th>Unit</th><th>Camera</th><th>Preset</th><th>Active</th>${canEdit ? "<th>Actions</th>" : ""}</tr></thead>
+          <tbody>${state.mappings.map((mapping) => `<tr><td>${mapping.unit.externalUnitId}${mapping.unit.unitName ? ` - ${mapping.unit.unitName}` : ""}</td><td>${mapping.camera.name}</td><td>${mapping.preset.presetCode}</td><td>${statusBadge(mapping.isActive ? "ACTIVE" : "INACTIVE")}</td>${canEdit ? `<td>${mapping.isActive ? `<button class="button danger mapping-deactivate-button" data-mapping-id="${mapping.id}" type="button">Deactivate</button>` : '<span class="muted-text">No action</span>'}</td>` : ""}</tr>`).join("")}</tbody>
         </table>` : "<p>No mappings configured.</p>"}
     </article>
     ${canEdit ? `
@@ -676,6 +743,9 @@ function renderMappings() {
   if (canEdit) {
     document.querySelector('#mapping-form select[name="cameraId"]')?.addEventListener("change", handleMappingCameraChange);
     document.getElementById("mapping-form")?.addEventListener("submit", handleMappingSave);
+    document.querySelectorAll(".mapping-deactivate-button").forEach((button) => {
+      button.addEventListener("click", () => handleMappingDeactivate(button.dataset.mappingId));
+    });
   }
 }
 
@@ -804,6 +874,27 @@ async function handleTsdSync() {
   }
 }
 
+async function handleTsdDeactivate() {
+  if (!state.tsdConfig) return;
+  const confirmed = window.confirm("Deactivate the current TS-D1000 configuration?");
+  if (!confirmed) return;
+
+  try {
+    await fetchJson(`/api/v1/config/tsd/${state.tsdConfig.id}/deactivate`, {
+      method: "PATCH",
+      body: JSON.stringify({ reason: "Deactivated from browser test" }),
+    });
+    await loadTsdData();
+    state.overview = await fetchJson("/api/v1/config/overview", { method: "GET" });
+    renderTsd();
+    renderOverview();
+    renderMappings();
+    setSessionMessage("TS-D1000 configuration deactivated.");
+  } catch (error) {
+    setViewError(error.message || "Unable to deactivate TS-D1000 configuration.");
+  }
+}
+
 async function handleCameraSave(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -903,6 +994,24 @@ async function handlePresetSave(event) {
   }
 }
 
+async function handlePresetDelete(presetId) {
+  if (!presetId) return;
+  const confirmed = window.confirm("Delete this preset?");
+  if (!confirmed) return;
+
+  try {
+    await fetchJson(`/api/v1/config/presets/${presetId}`, {
+      method: "DELETE",
+    });
+    await loadCameraData();
+    renderCameras();
+    renderMappings();
+    setSessionMessage("Preset deleted.");
+  } catch (error) {
+    setViewError(error.message || "Unable to delete preset.");
+  }
+}
+
 async function handleLayoutUpload(event) {
   event.preventDefault();
   const fileInput = event.currentTarget.querySelector('input[name="file"]');
@@ -913,8 +1022,8 @@ async function handleLayoutUpload(event) {
   const body = new FormData();
   body.append("file", fileInput.files[0]);
   try {
-    await fetchJson("/api/v1/config/layout", {
-      method: "POST",
+    await fetchJson(state.layout ? `/api/v1/config/layout/${state.layout.id}/replace` : "/api/v1/config/layout", {
+      method: state.layout ? "PUT" : "POST",
       body,
     });
     await loadLayoutData();
@@ -1018,11 +1127,46 @@ async function handleMappingSave(event) {
   }
 }
 
+async function handleMappingDeactivate(mappingId) {
+  if (!mappingId) return;
+  const confirmed = window.confirm("Deactivate this mapping?");
+  if (!confirmed) return;
+
+  try {
+    await fetchJson(`/api/v1/config/mappings/${mappingId}/deactivate`, {
+      method: "PATCH",
+    });
+    await loadMappingsData();
+    state.overview = await fetchJson("/api/v1/config/overview", { method: "GET" });
+    renderMappings();
+    renderOverview();
+    setSessionMessage("Mapping deactivated.");
+  } catch (error) {
+    setViewError(error.message || "Unable to deactivate mapping.");
+  }
+}
+
 async function handleModeSave(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   try {
     const mode = String(form.get("mode") || "");
+
+    // UC-SWITCH-01: warn before switching mode during an active session.
+    if (isAdmin()) {
+      const snapshot = await fetchJson("/api/v1/runtime/snapshot", { method: "GET" }).catch(() => null);
+      if (snapshot && snapshot.operationMode && snapshot.operationMode !== mode) {
+        const activeCount = Array.isArray(snapshot.activeSpeakers) ? snapshot.activeSpeakers.length : 0;
+        const pendingCount = Array.isArray(snapshot.pendingRequests) ? snapshot.pendingRequests.length : 0;
+        if (activeCount > 0 || pendingCount > 0) {
+          const confirmed = window.confirm(
+            `There are currently ${activeCount} active speaker(s) and ${pendingCount} pending request(s). Switching mode may affect the current session. Continue?`
+          );
+          if (!confirmed) return;
+        }
+      }
+    }
+
     await fetchJson("/api/v1/config/mode", {
       method: "PUT",
       body: JSON.stringify({ mode }),
@@ -1036,6 +1180,645 @@ async function handleModeSave(event) {
     setViewError(error.message || "Unable to update mode.");
   }
 }
+
+function unitById(unitId) {
+  return state.units.find((unit) => unit.id === unitId) || null;
+}
+
+function cameraById(cameraId) {
+  return state.cameras.find((camera) => camera.id === cameraId) || null;
+}
+
+async function loadRuntimeSnapshot() {
+  state.runtimeSnapshot = await fetchJson("/api/v1/runtime/snapshot", { method: "GET" });
+  // Use runtime snapshot as the source-of-truth for mode badge on runtime screens.
+  if (state.runtimeSnapshot?.operationMode) {
+    state.mode = state.runtimeSnapshot.operationMode;
+  }
+  renderTopbarStatus();
+}
+
+async function loadRuntimeRequests() {
+  const result = await fetchJson("/api/v1/runtime/requests?page=1&pageSize=50", { method: "GET" });
+  state.runtimeRequests = result.items || [];
+}
+
+function renderRuntimeManual() {
+  const host = viewSections["runtime-manual"];
+  const snap = state.runtimeSnapshot;
+  if (!snap) {
+    host.innerHTML = `<div class="card"><h4>Runtime state not loaded</h4><p>Waiting for data...</p></div>`;
+    return;
+  }
+
+  const modeBadge = statusBadge(snap.operationMode);
+  const sseBadge = statusBadge(snap.sseStatus);
+
+  const activeSpeakers = (snap.activeSpeakers || []).map((unitId) => unitById(unitId)).filter(Boolean);
+  const pendingRequests = (state.runtimeRequests || []).filter((req) => req.status === "PENDING");
+  const isManual = snap.operationMode === "MANUAL";
+
+  const queuePanel = isManual
+    ? `
+      <div class="card">
+        <div class="card-header">
+          <h4>Pending Requests</h4>
+          <div class="pill-row">${modeBadge}${sseBadge}</div>
+        </div>
+        ${
+          pendingRequests.length === 0
+            ? `<p class="empty">No pending requests.</p>`
+            : `<div class="stack">
+                ${pendingRequests
+                  .map((req) => {
+                    const unit = unitById(req.unitId);
+                    const label = unit ? `${unit.externalUnitId} - ${unit.unitName || "Unnamed"}` : req.unitId;
+                    return `
+                      <div class="row-card">
+                        <div>
+                          <div class="row-title">${label}</div>
+                          <div class="row-meta">${statusBadge(req.status)} <span class="muted">Requested:</span> ${formatDate(req.createdAt)}</div>
+                        </div>
+                        <div class="row-actions">
+                          <button class="button primary" data-runtime-approve="${req.id}" type="button">Approve</button>
+                          <button class="button danger" data-runtime-reject="${req.id}" type="button">Reject</button>
+                        </div>
+                      </div>`;
+                  })
+                  .join("")}
+              </div>`
+        }
+      </div>`
+    : `
+      <div class="card">
+        <div class="card-header">
+          <h4>Automatic Mode</h4>
+          <div class="pill-row">${modeBadge}${sseBadge}</div>
+        </div>
+        <p class="hint">Request queue and Approve/Reject actions are hidden in AUTOMATIC mode.</p>
+      </div>`;
+
+  host.innerHTML = `
+    <div class="grid two">
+      ${queuePanel}
+      <div class="card">
+        <div class="card-header">
+          <h4>Active Speakers</h4>
+          <div class="pill-row">${statusBadge(activeSpeakers.length)}</div>
+        </div>
+        ${
+          activeSpeakers.length === 0
+            ? `<p class="empty">No active speakers.</p>`
+            : `<div class="stack">
+                ${activeSpeakers
+                  .map((unit) => {
+                    return `<div class="row-card">
+                      <div>
+                        <div class="row-title">${unit.externalUnitId} - ${unit.unitName || "Unnamed"}</div>
+                        <div class="row-meta">${statusBadge("SPEAKING")} <span class="muted">Type:</span> ${unit.deviceType}</div>
+                      </div>
+                    </div>`;
+                  })
+                  .join("")}
+              </div>`
+        }
+
+        <div class="divider"></div>
+        <h4>Camera Target</h4>
+        ${
+          snap.currentCameraTarget
+            ? (() => {
+                const cam = cameraById(snap.currentCameraTarget.cameraId);
+                const unit = unitById(snap.currentCameraTarget.unitId);
+                return `<p><strong>Unit:</strong> ${unit ? unit.externalUnitId : snap.currentCameraTarget.unitId}</p>
+                        <p><strong>Camera:</strong> ${cam ? cam.name : snap.currentCameraTarget.cameraId}</p>
+                        <p><strong>Preset:</strong> ${snap.currentCameraTarget.presetId}</p>`;
+              })()
+            : `<p class="empty">No camera target.</p>`
+        }
+      </div>
+    </div>
+  `;
+
+  if (isManual) {
+    host.querySelectorAll("[data-runtime-approve]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        await approveRuntimeRequest(button.dataset.runtimeApprove);
+      });
+    });
+    host.querySelectorAll("[data-runtime-reject]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        await rejectRuntimeRequest(button.dataset.runtimeReject);
+      });
+    });
+  }
+}
+
+function buildUnitStateMap() {
+  const snapUnits = state.runtimeSnapshot?.units || {};
+  const result = {};
+  for (const [unitId, item] of Object.entries(snapUnits)) {
+    if (item && typeof item === "object") {
+      result[unitId] = item.state || "IDLE";
+    }
+  }
+  return result;
+}
+
+function renderRuntimeMap() {
+  const host = viewSections["runtime-map"];
+  const snap = state.runtimeSnapshot;
+
+  if (!state.layout) {
+    host.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h4>Realtime Map</h4>
+          <div class="pill-row">${snap ? statusBadge(snap.operationMode) : ""}${snap ? statusBadge(snap.sseStatus) : ""}</div>
+        </div>
+        <p class="hint">No layout configured yet. Upload a layout in <strong>System Configuration</strong> to enable the map canvas.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const filters = state.runtimeMapFilters;
+  const unitStates = buildUnitStateMap();
+  const activeSet = new Set(snap?.activeSpeakers || []);
+  const pendingUnitIds = new Set(
+    (state.runtimeRequests || [])
+      .filter((req) => req.status === "PENDING")
+      .map((req) => req.unitId)
+      .filter(Boolean)
+  );
+
+  const placed = state.layoutDevices || [];
+  const selected = state.runtimeSelectedDevice;
+
+  const dots = placed
+    .map((device) => {
+      const refType = device.refType;
+      const refId = device.refId;
+      const isCamera = refType === "CAMERA";
+      const unitState = !isCamera ? unitStates[refId] || "IDLE" : "IDLE";
+      const isActiveSpeaker = !isCamera && activeSet.has(refId);
+      const isPending = !isCamera && pendingUnitIds.has(refId);
+
+      if (filters.showActiveSpeakersOnly && !isActiveSpeaker) return null;
+      if (!filters.showPendingRequests && isPending) return null;
+      if (!filters.showCameras && isCamera) return null;
+
+      const statusClass = !isCamera
+        ? unitState === "SPEAKING"
+          ? "speaking"
+          : unitState === "REQUEST" || isPending
+            ? "request"
+            : unitState === "OFFLINE"
+              ? "offline"
+              : ""
+        : "";
+
+      const label = device.iconLabel || (isCamera ? "Cam" : "Unit");
+      const x = Math.max(0, Math.min(1, Number(device.posX ?? 0))) * 100;
+      const y = Math.max(0, Math.min(1, Number(device.posY ?? 0))) * 100;
+      const isSelected = selected && selected.refType === refType && selected.refId === refId;
+
+      return `
+        <div
+          class="device-dot ${statusClass} ${isSelected ? "selected" : ""}"
+          style="left:${x}%; top:${y}%"
+          data-device-ref-type="${refType}"
+          data-device-ref-id="${refId}"
+          role="button"
+          tabindex="0"
+          aria-label="${label}"
+        >
+          <strong>${label}</strong>
+          ${isCamera ? statusBadge("CAMERA") : statusBadge(unitState)}
+        </div>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  const selectedPanel = (() => {
+    if (!selected) {
+      return `<p class="hint">Select a device on the canvas to see details.</p>`;
+    }
+    if (selected.refType === "CAMERA") {
+      const camera = cameraById(selected.refId);
+      return `
+        <dl class="meta">
+          <div><dt>Type</dt><dd>Camera</dd></div>
+          <div><dt>Name</dt><dd>${camera?.name || selected.refId}</dd></div>
+          <div><dt>Status</dt><dd>${statusBadge(camera?.status || "UNKNOWN")}</dd></div>
+        </dl>
+      `;
+    }
+    const unit = unitById(selected.refId);
+    const unitState = unitStates[selected.refId] || "IDLE";
+    return `
+      <dl class="meta">
+        <div><dt>Type</dt><dd>${unit?.deviceType || "Unit"}</dd></div>
+        <div><dt>Unit</dt><dd>${unit ? `${unit.externalUnitId} - ${unit.unitName || "Unnamed"}` : selected.refId}</dd></div>
+        <div><dt>Runtime State</dt><dd>${statusBadge(unitState)}</dd></div>
+        <div><dt>Last Event</dt><dd>${formatDate(state.runtimeSnapshot?.units?.[selected.refId]?.lastEventAt)}</dd></div>
+      </dl>
+    `;
+  })();
+
+  host.innerHTML = `
+    <div class="layout-shell">
+      <div class="card">
+        <div class="card-header">
+          <h4>Legend & Filters</h4>
+          <div class="pill-row">${snap ? statusBadge(snap.operationMode) : ""}${snap ? statusBadge(snap.sseStatus) : ""}</div>
+        </div>
+        <div class="stack-form">
+          <label class="choice-row">
+            <input type="checkbox" data-filter="activeOnly" ${filters.showActiveSpeakersOnly ? "checked" : ""} />
+            <span><strong>Active speakers only</strong><small>Show only units that are currently speaking.</small></span>
+          </label>
+          <label class="choice-row">
+            <input type="checkbox" data-filter="pending" ${filters.showPendingRequests ? "checked" : ""} />
+            <span><strong>Show pending requests</strong><small>REQUEST state highlight in MANUAL mode.</small></span>
+          </label>
+          <label class="choice-row">
+            <input type="checkbox" data-filter="cameras" ${filters.showCameras ? "checked" : ""} />
+            <span><strong>Show cameras</strong><small>Render placed camera icons.</small></span>
+          </label>
+          <div class="button-row">
+            <button class="button secondary" id="map-reset-btn" type="button">Reset Selection</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <p class="hint"><strong>States</strong>: ${statusBadge("REQUEST")} ${statusBadge("SPEAKING")} ${statusBadge("IDLE")} ${statusBadge("OFFLINE")}</p>
+      </div>
+
+      <div class="layout-canvas" aria-label="Layout canvas">
+        <div class="layout-grid"></div>
+        ${dots || `<div class="camera-frame">No placed devices yet. Place units/cameras in Layout & Map.</div>`}
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h4>Selected Device</h4></div>
+        ${selectedPanel}
+        <div class="divider"></div>
+        <h4>Current Camera Target</h4>
+        ${
+          snap?.currentCameraTarget
+            ? (() => {
+                const cam = cameraById(snap.currentCameraTarget.cameraId);
+                const unit = unitById(snap.currentCameraTarget.unitId);
+                return `<p><strong>Unit:</strong> ${unit ? unit.externalUnitId : snap.currentCameraTarget.unitId}</p>
+                        <p><strong>Camera:</strong> ${cam ? cam.name : snap.currentCameraTarget.cameraId}</p>
+                        <p><strong>Preset:</strong> ${snap.currentCameraTarget.presetId}</p>`;
+              })()
+            : `<p class="empty">No camera target.</p>`
+        }
+      </div>
+    </div>
+  `;
+
+  host.querySelector("#map-reset-btn")?.addEventListener("click", () => {
+    state.runtimeSelectedDevice = null;
+    renderRuntimeMap();
+  });
+
+  host.querySelectorAll("[data-filter]").forEach((node) => {
+    node.addEventListener("change", () => {
+      const key = node.dataset.filter;
+      if (key === "activeOnly") state.runtimeMapFilters.showActiveSpeakersOnly = node.checked;
+      if (key === "pending") state.runtimeMapFilters.showPendingRequests = node.checked;
+      if (key === "cameras") state.runtimeMapFilters.showCameras = node.checked;
+      renderRuntimeMap();
+    });
+  });
+
+  host.querySelectorAll("[data-device-ref-type]").forEach((node) => {
+    const select = () => {
+      state.runtimeSelectedDevice = {
+        refType: node.dataset.deviceRefType,
+        refId: node.dataset.deviceRefId,
+      };
+      renderRuntimeMap();
+    };
+    node.addEventListener("click", select);
+    node.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        select();
+      }
+    });
+  });
+}
+
+function renderRuntimeCameras() {
+  const host = viewSections["runtime-cameras"];
+  const snap = state.runtimeSnapshot;
+
+  const activeCameras = (state.cameras || []).filter((cam) => cam.status === "ACTIVE");
+  const grid = Number(state.runtimeCameraGrid) || 2;
+  const gridClass = grid === 4 ? "grid four" : grid === 3 ? "grid three" : grid === 1 ? "grid" : "grid two";
+
+  host.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h4>Camera View</h4>
+        <div class="pill-row">${snap ? statusBadge(snap.operationMode) : ""}${snap ? statusBadge(snap.sseStatus) : ""}</div>
+      </div>
+      <div class="row-actions">
+        <span class="muted">Grid:</span>
+        <button class="button secondary" data-grid="1" type="button">1</button>
+        <button class="button secondary" data-grid="2" type="button">2</button>
+        <button class="button secondary" data-grid="4" type="button">4</button>
+      </div>
+    </div>
+
+    <div class="${gridClass}">
+      ${
+        activeCameras.length === 0
+          ? `<div class="card"><p class="empty">No active cameras configured.</p></div>`
+          : activeCameras
+              .slice(0, 4)
+              .map((cam) => {
+                const isTarget = snap?.currentCameraTarget?.cameraId === cam.id;
+                const targetUnit = snap?.currentCameraTarget?.unitId ? unitById(snap.currentCameraTarget.unitId) : null;
+                const targetLabel = isTarget
+                  ? targetUnit
+                    ? `${targetUnit.externalUnitId} - ${targetUnit.unitName || "Unnamed"}`
+                    : snap.currentCameraTarget.unitId
+                  : "No target";
+                return `
+                  <div class="camera-tile">
+                    <div class="camera-tile-header">
+                      <div>
+                        <div class="row-title">${cam.name}</div>
+                        <div class="row-meta">${statusBadge(cam.status)} ${cam.protocol ? statusBadge(cam.protocol) : ""}</div>
+                      </div>
+                      <div class="pill-row">${isTarget ? statusBadge("TARGET") : statusBadge("IDLE")}</div>
+                    </div>
+                    <div class="camera-frame">
+                      <div>
+                        <div><strong>Current target</strong></div>
+                        <div class="muted">${targetLabel}</div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("")
+      }
+    </div>
+  `;
+
+  host.querySelectorAll("[data-grid]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.runtimeCameraGrid = Number(btn.dataset.grid) || 2;
+      renderRuntimeCameras();
+    });
+  });
+}
+
+function renderRuntimeMonitor() {
+  const host = viewSections["runtime-monitor"];
+  const snap = state.runtimeSnapshot;
+
+  host.innerHTML = `
+    <div class="grid two">
+      <div class="card">
+        <div class="card-header">
+          <h4>SSE / Runtime Status</h4>
+          <div class="pill-row">${snap ? statusBadge(snap.sseStatus) : statusBadge("UNKNOWN")}</div>
+        </div>
+        <p class="muted">Mode: ${snap ? statusBadge(snap.operationMode) : "N/A"}</p>
+        <div class="row-actions">
+          <button class="button secondary" id="runtime-refresh-btn" type="button">Refresh</button>
+          ${
+            isAdmin()
+              ? `<button class="button primary" id="runtime-start-btn" type="button">Start Runtime</button>
+                 <button class="button danger" id="runtime-stop-btn" type="button">Stop Runtime</button>`
+              : `<span class="muted">Admin can start/stop runtime.</span>`
+          }
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h4>Snapshot</h4>
+        </div>
+        <pre class="code">${snap ? JSON.stringify(snap, null, 2) : "No snapshot loaded"}</pre>
+      </div>
+    </div>
+  `;
+
+  host.querySelector("#runtime-refresh-btn")?.addEventListener("click", async () => {
+    try {
+      await Promise.all([loadRuntimeSnapshot(), loadRuntimeRequests()]);
+      renderRuntimeViews();
+      setSessionMessage("Runtime refreshed.");
+    } catch (error) {
+      setViewError(error.message || "Unable to refresh runtime.");
+    }
+  });
+
+  host.querySelector("#runtime-start-btn")?.addEventListener("click", async () => {
+    try {
+      await fetchJson("/internal/runtime/start", { method: "POST" });
+      await loadRuntimeSnapshot();
+      renderRuntimeViews();
+      setSessionMessage("Runtime started.");
+    } catch (error) {
+      setViewError(error.message || "Unable to start runtime.");
+    }
+  });
+
+  host.querySelector("#runtime-stop-btn")?.addEventListener("click", async () => {
+    const confirmed = window.confirm("Stop runtime listener?");
+    if (!confirmed) return;
+    try {
+      await fetchJson("/internal/runtime/stop", { method: "POST" });
+      await loadRuntimeSnapshot();
+      renderRuntimeViews();
+      setSessionMessage("Runtime stopped.");
+    } catch (error) {
+      setViewError(error.message || "Unable to stop runtime.");
+    }
+  });
+}
+
+function renderRuntimeViews() {
+  renderTopbarStatus();
+  if (state.currentView === "runtime-manual") {
+    renderRuntimeManual();
+  }
+  if (state.currentView === "runtime-map") {
+    renderRuntimeMap();
+  }
+  if (state.currentView === "runtime-cameras") {
+    renderRuntimeCameras();
+  }
+  if (state.currentView === "runtime-monitor") {
+    renderRuntimeMonitor();
+  }
+}
+
+async function approveRuntimeRequest(requestId) {
+  if (!requestId) return;
+  try {
+    await fetchJson(`/api/v1/runtime/requests/${requestId}/approve`, { method: "POST" });
+    await loadRuntimeRequests();
+    await loadRuntimeSnapshot();
+    renderRuntimeViews();
+    setSessionMessage("Request approved.");
+  } catch (error) {
+    setViewError(error.message || "Unable to approve request.");
+  }
+}
+
+async function rejectRuntimeRequest(requestId) {
+  if (!requestId) return;
+  const confirmed = window.confirm("Reject this request?");
+  if (!confirmed) return;
+  try {
+    await fetchJson(`/api/v1/runtime/requests/${requestId}/reject`, { method: "POST" });
+    await loadRuntimeRequests();
+    await loadRuntimeSnapshot();
+    renderRuntimeViews();
+    setSessionMessage("Request rejected.");
+  } catch (error) {
+    setViewError(error.message || "Unable to reject request.");
+  }
+}
+
+function startRuntimePolling() {
+  if (state.runtimePollHandle) return;
+
+  const tick = async () => {
+    try {
+      await Promise.all([loadRuntimeSnapshot(), loadRuntimeRequests()]);
+      renderRuntimeViews();
+    } catch (error) {
+      // Non-blocking; show a single banner.
+      setViewError(error.message || "Unable to load runtime state.");
+    }
+  };
+
+  tick();
+  state.runtimePollHandle = window.setInterval(tick, 1000);
+}
+
+function stopRuntimePolling() {
+  if (!state.runtimePollHandle) return;
+  window.clearInterval(state.runtimePollHandle);
+  state.runtimePollHandle = null;
+}
+
+function closeModal() {
+  if (!modalRoot) return;
+  modalRoot.innerHTML = "";
+}
+
+async function openChangeModeModal() {
+  if (!isAdmin()) return;
+  if (!modalRoot) return;
+
+  closeModal();
+
+  const currentMode = state.runtimeSnapshot?.operationMode || state.mode || "MANUAL";
+  modalRoot.innerHTML = `
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Change operation mode">
+      <div class="modal">
+        <div class="modal-header">
+          <h4>Change Operation Mode</h4>
+          <button class="button danger ghost" id="mode-modal-close" type="button">Close</button>
+        </div>
+        <div id="mode-impact" class="alert hidden" role="alert"></div>
+        <form id="mode-modal-form" class="stack-form">
+          <label class="choice-row">
+            <input type="radio" name="mode" value="MANUAL" ${currentMode === "MANUAL" ? "checked" : ""} />
+            <span><strong>MANUAL</strong><small>Show queue and require approve/reject.</small></span>
+          </label>
+          <label class="choice-row">
+            <input type="radio" name="mode" value="AUTOMATIC" ${currentMode === "AUTOMATIC" ? "checked" : ""} />
+            <span><strong>AUTOMATIC</strong><small>Hide queue and follow active speaker events directly.</small></span>
+          </label>
+          <div class="modal-actions">
+            <button class="button secondary" id="mode-modal-cancel" type="button">Cancel</button>
+            <button class="button primary" id="mode-modal-save" type="submit">Save Mode</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const overlay = modalRoot.querySelector(".modal-overlay");
+  const impactNode = modalRoot.querySelector("#mode-impact");
+  const closeBtn = modalRoot.querySelector("#mode-modal-close");
+  const cancelBtn = modalRoot.querySelector("#mode-modal-cancel");
+  const form = modalRoot.querySelector("#mode-modal-form");
+
+  const hide = () => closeModal();
+  closeBtn?.addEventListener("click", hide);
+  cancelBtn?.addEventListener("click", hide);
+  overlay?.addEventListener("click", (ev) => {
+    if (ev.target === overlay) hide();
+  });
+  window.addEventListener(
+    "keydown",
+    (ev) => {
+      if (ev.key === "Escape") hide();
+    },
+    { once: true }
+  );
+
+  try {
+    const impact = await fetchJson("/api/v1/runtime/mode/switch-impact", { method: "GET" });
+    if (impact?.warningMessage) {
+      impactNode.textContent = impact.warningMessage;
+      impactNode.classList.remove("hidden");
+    }
+  } catch {
+    // best effort
+  }
+
+  form?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      const selected = form.querySelector("input[name='mode']:checked")?.value;
+      if (!selected) {
+        impactNode.textContent = "Mode is required.";
+        impactNode.classList.remove("hidden");
+        return;
+      }
+
+      if (selected === currentMode) {
+        setSessionMessage("No changes. Mode is already set.");
+        hide();
+        return;
+      }
+
+      await fetchJson("/api/v1/runtime/mode", {
+        method: "PUT",
+        body: JSON.stringify({ mode: selected }),
+      });
+
+      await Promise.all([loadModeData(), loadRuntimeSnapshot(), loadRuntimeRequests()]);
+      state.overview = await fetchJson("/api/v1/config/overview", { method: "GET" });
+      renderAllViews();
+      renderRuntimeViews();
+      setSessionMessage("Operation mode updated.");
+      hide();
+    } catch (error) {
+      impactNode.textContent = error.message || "Unable to update mode.";
+      impactNode.classList.remove("hidden");
+    }
+  });
+}
+
+modeBadgeButton?.addEventListener("click", () => {
+  openChangeModeModal();
+});
 
 usernameInput.addEventListener("blur", () => {
   if (usernameInput.value.trim()) setFieldError("username", "");

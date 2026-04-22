@@ -88,6 +88,9 @@ export const apiClient = {
       token,
     );
   },
+  del<T>(path: string, token?: string) {
+    return request<T>(path, { method: 'DELETE' }, token);
+  },
   upload<T>(path: string, body: FormData, token?: string) {
     return request<T>(
       path,

@@ -130,6 +130,10 @@ export class MicCameraMappingsRepository extends BaseRepository<MicCameraMapping
   findActiveByCameraId(cameraId: string): MicCameraMappingEntity[] {
     return this.list().filter((item) => item.cameraId === cameraId && item.isActive);
   }
+
+  findActiveByPresetId(presetId: string): MicCameraMappingEntity[] {
+    return this.list().filter((item) => item.presetId === presetId && item.isActive);
+  }
 }
 
 export function buildSeedUnits(roomId: string): TsdUnitEntity[] {
