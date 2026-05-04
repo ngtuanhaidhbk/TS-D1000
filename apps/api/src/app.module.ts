@@ -7,6 +7,7 @@ import { RuntimeModule } from './modules/runtime/runtime.module';
 import { SystemConfigModule } from './modules/system-config/system-config.module';
 import { UsersModule } from './modules/users/users.module';
 import { LiveMonitoringModule } from './modules/live-monitoring/live-monitoring.module';
+import { LoggingModule } from './modules/logging/logging.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { LiveMonitoringModule } from './modules/live-monitoring/live-monitoring.
     SystemConfigModule,
     RuntimeModule,
     LiveMonitoringModule,
+    LoggingModule,
   ],
 })
 export class AppModule {}
