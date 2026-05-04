@@ -8,7 +8,10 @@ build/
 .env.*.local
 coverage/
 *.log
+*.tsbuildinfo
 apps/api/dist/
 apps/web/dist/
 apps/web/.vite/
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
 data/

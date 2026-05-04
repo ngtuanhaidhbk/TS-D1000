@@ -14,7 +14,7 @@ describe('AppLayout', () => {
     vi.clearAllMocks();
   });
 
-  it('shows admin-only navigation items for admin users', () => {
+  it('shows system configuration navigation for admin users and keeps admin-only entries visible', () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       isBootstrapping: false,
@@ -33,11 +33,14 @@ describe('AppLayout', () => {
 
     renderWithRouter();
 
-    expect(screen.getByText('Config')).toBeInTheDocument();
+    expect(screen.getByText('System Configuration')).toBeInTheDocument();
+    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(screen.getByText('TS-D1000')).toBeInTheDocument();
     expect(screen.getByText('Logs')).toBeInTheDocument();
+    expect(screen.getByText('Audit Logs')).toBeInTheDocument();
   });
 
-  it('hides admin-only navigation items for operator users', () => {
+  it('keeps system configuration visible for operator users but hides admin-only entries', () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       isBootstrapping: false,
@@ -56,8 +59,16 @@ describe('AppLayout', () => {
 
     renderWithRouter();
 
-    expect(screen.queryByText('Config')).not.toBeInTheDocument();
-    expect(screen.queryByText('Logs')).not.toBeInTheDocument();
+    expect(screen.getByText('System Configuration')).toBeInTheDocument();
+    expect(screen.getByText('Readiness Check')).toBeInTheDocument();
+    expect(screen.queryByText('User Management')).not.toBeInTheDocument();
+
+    // Operator can view runtime/camera/system error logs, but cannot access audit logs.
+    expect(screen.getByText('Logs')).toBeInTheDocument();
+    expect(screen.queryByText('Audit Logs')).not.toBeInTheDocument();
+    expect(screen.getByText('Runtime Logs')).toBeInTheDocument();
+    expect(screen.getByText('Camera Logs')).toBeInTheDocument();
+    expect(screen.getByText('System Errors')).toBeInTheDocument();
   });
 
   it('opens logout confirmation dialog before calling logout', () => {

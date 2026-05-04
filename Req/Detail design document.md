@@ -195,6 +195,35 @@ He thong la ung dung desktop dung de:
 - UC-LOG-01
 - UC-LOG-02
 
+### 2.11 Live Monitoring Module
+
+**Responsibility**
+
+- provide realtime monitoring UI data
+- expose runtime dashboard and map state
+- support live event feed and alerts
+- support runtime status and admin recovery actions
+
+**Related UCs**
+
+- UC-LIVE-01
+- UC-LIVE-02
+- UC-LIVE-03
+- UC-LIVE-04
+- UC-LIVE-05
+- UC-LIVE-06
+- UC-LIVE-07
+- UC-LIVE-08
+- UC-LIVE-09
+- UC-LIVE-10
+- UC-LIVE-11
+- UC-LIVE-12
+- UC-LIVE-13
+- UC-LIVE-14
+- UC-LIVE-15
+- UC-LIVE-16
+- UC-LIVE-17
+
 ---
 
 ## 3. Data Model

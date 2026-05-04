@@ -3,7 +3,11 @@ import { ConfigModule } from '@nestjs/config';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
+import { RuntimeModule } from './modules/runtime/runtime.module';
+import { SystemConfigModule } from './modules/system-config/system-config.module';
 import { UsersModule } from './modules/users/users.module';
+import { LiveMonitoringModule } from './modules/live-monitoring/live-monitoring.module';
+import { LoggingModule } from './modules/logging/logging.module';
 
 @Module({
   imports: [
@@ -14,6 +18,10 @@ import { UsersModule } from './modules/users/users.module';
     UsersModule,
     AuthModule,
     HealthModule,
+    SystemConfigModule,
+    RuntimeModule,
+    LiveMonitoringModule,
+    LoggingModule,
   ],
 })
 export class AppModule {}
