@@ -33,6 +33,7 @@ Bo Use Cases (UC) duoc chuyen doi tu requirement hien co cua he thong dieu khien
 10. Camera Operation
 11. Live Video Monitoring
 12. Logging & Audit
+13. Live Monitoring
 
 ## 2. List of Use Cases per Module
 
@@ -103,6 +104,26 @@ Bo Use Cases (UC) duoc chuyen doi tu requirement hien co cua he thong dieu khien
 
 - UC-LOG-01: Record Audit Log
 - UC-LOG-02: View System Logs
+
+### 13. Live Monitoring
+
+- UC-LIVE-01: View Live Monitoring Dashboard
+- UC-LIVE-02: Refresh Live Runtime Snapshot
+- UC-LIVE-03: View Realtime Map State
+- UC-LIVE-04: Highlight Unit Runtime State on Map
+- UC-LIVE-05: View Active Speaker List
+- UC-LIVE-06: View Pending Request Queue Summary
+- UC-LIVE-07: View Unit Runtime Detail
+- UC-LIVE-08: View Camera Runtime Status
+- UC-LIVE-09: View Current Camera Target
+- UC-LIVE-10: View Camera Trigger Result
+- UC-LIVE-11: View Live Event Feed
+- UC-LIVE-12: Filter Live Event Feed
+- UC-LIVE-13: View Runtime Alerts
+- UC-LIVE-14: Acknowledge Runtime Alert
+- UC-LIVE-15: View SSE / Runtime Connection Status
+- UC-LIVE-16: Handle Runtime Disconnected State
+- UC-LIVE-17: Run Runtime Recovery Action
 
 ## 3. Full Detailed Use Cases
 

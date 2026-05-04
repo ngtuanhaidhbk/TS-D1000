@@ -77,6 +77,44 @@ enum LogLevel {
   ERROR
 }
 
+enum AlertSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum RuntimeConnectionStatus {
+  CONNECTED
+  RECONNECTING
+  DISCONNECTED
+  UNAVAILABLE
+}
+
+enum CameraRuntimeResult {
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum RuntimeRecoveryAction {
+  RECONNECT
+  RECOVER_STATE
+}
+
+enum RuntimeRecoveryResult {
+  SUCCESS
+  FAILED
+  IN_PROGRESS
+  TIMEOUT
+}
+
 model User {
   id            String        @id @default(uuid()) @db.Uuid
   username      String        @unique @db.VarChar(100)
@@ -131,6 +169,12 @@ model Room {
   speakingRequests    SpeakingRequest[]
   runtimeEvents       RuntimeEvent[]
   systemLogs          SystemLog[]
+  runtimeRoomState    RuntimeRoomState?
+  runtimeUnitsState   RuntimeUnitsState[]
+  runtimeCameraState  RuntimeCameraState[]
+  runtimeCameraLogs   RuntimeCameraLog[]
+  runtimeAlerts       RuntimeAlert[]
+  runtimeRecoveryLogs RuntimeRecoveryLog[]
 
   @@map("rooms")
 }
@@ -212,7 +256,8 @@ model TsdUnit {
   mappings       MicCameraMapping[]
   speakingRequests SpeakingRequest[]
   runtimeEvents  RuntimeEvent[]
-  cameraRuntimeStates CameraRuntimeState[]
+  runtimeState   RuntimeUnitsState[]
+  cameraRuntimeCurrentUnit CameraRuntimeState[]
 
   @@map("tsd_units")
   @@unique([roomId, externalUnitId])
@@ -242,7 +287,8 @@ model Camera {
   room              Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
   presets           CameraPreset[]
   mappings          MicCameraMapping[]
-  runtimeState      CameraRuntimeState?
+  runtimeState      RuntimeCameraState?
+  runtimeLogs       RuntimeCameraLog[]
 
   @@map("cameras")
   @@unique([roomId, ipAddress, port])
@@ -257,7 +303,7 @@ model CameraPreset {
   updatedAt   DateTime          @updatedAt @map("updated_at")
   camera      Camera            @relation(fields: [cameraId], references: [id], onDelete: Cascade)
   mappings    MicCameraMapping[]
-  runtimeStates CameraRuntimeState[]
+  runtimeStates RuntimeCameraState[]
 
   @@map("camera_presets")
   @@unique([cameraId, presetCode])
@@ -324,21 +370,6 @@ model SpeakingRequest {
   @@index([unitId, status])
 }
 
-model CameraRuntimeState {
-  id              String        @id @default(uuid()) @db.Uuid
-  cameraId        String        @unique @map("camera_id") @db.Uuid
-  currentPresetId String?       @map("current_preset_id") @db.Uuid
-  currentUnitId   String?       @map("current_unit_id") @db.Uuid
-  lastSwitchAt    DateTime?     @map("last_switch_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  camera          Camera        @relation(fields: [cameraId], references: [id], onDelete: Cascade)
-  currentPreset   CameraPreset? @relation(fields: [currentPresetId], references: [id], onDelete: SetNull)
-  currentUnit     TsdUnit?      @relation(fields: [currentUnitId], references: [id], onDelete: SetNull)
-
-  @@map("camera_runtime_states")
-}
-
 model SystemLog {
   id          String   @id @default(uuid()) @db.Uuid
   roomId       String? @map("room_id") @db.Uuid
@@ -352,6 +383,110 @@ model SystemLog {
   @@map("system_logs")
   @@index([level, createdAt(sort: Desc)])
   @@index([module, createdAt(sort: Desc)])
+}
+
+model RuntimeRoomState {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  roomId                  String                   @unique @map("room_id") @db.Uuid
+  operationMode           OperationMode            @map("operation_mode") @db.VarChar(20)
+  sseStatus               RuntimeConnectionStatus  @default(DISCONNECTED) @map("sse_status") @db.VarChar(30)
+  activeSpeakersJson      Json?                    @map("active_speakers_json")
+  pendingRequestsJson     Json?                    @map("pending_requests_json")
+  currentCameraTargetJson Json?                    @map("current_camera_target_json")
+  lastEventAt             DateTime?                @map("last_event_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  room                    Room                     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("runtime_room_state")
+  @@index([roomId])
+}
+
+model RuntimeUnitsState {
+  id             String           @id @default(uuid()) @db.Uuid
+  roomId         String           @map("room_id") @db.Uuid
+  unitId         String           @map("unit_id") @db.Uuid
+  state          UnitRuntimeState @map("state") @db.VarChar(20)
+  lastEventType  String?          @map("last_event_type") @db.VarChar(100)
+  lastEventAt    DateTime?        @map("last_event_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  room           Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  unit           TsdUnit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@map("runtime_units_state")
+  @@unique([roomId, unitId])
+  @@index([roomId, state])
+}
+
+model RuntimeCameraState {
+  id              String   @id @default(uuid()) @db.Uuid
+  cameraId        String   @unique @map("camera_id") @db.Uuid
+  roomId          String   @map("room_id") @db.Uuid
+  currentPresetId String?  @map("current_preset_id") @db.Uuid
+  currentUnitId   String?  @map("current_unit_id") @db.Uuid
+  lastSwitchAt    DateTime? @map("last_switch_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  camera          Camera   @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  room            Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  preset          CameraPreset? @relation(fields: [currentPresetId], references: [id], onDelete: SetNull)
+  unit            TsdUnit? @relation(fields: [currentUnitId], references: [id], onDelete: SetNull)
+
+  @@map("runtime_camera_state")
+  @@index([roomId])
+}
+
+model RuntimeCameraLog {
+  id             String              @id @default(uuid()) @db.Uuid
+  cameraId       String              @map("camera_id") @db.Uuid
+  roomId         String              @map("room_id") @db.Uuid
+  action         String              @db.VarChar(100)
+  result         CameraRuntimeResult @db.VarChar(20)
+  reason         String?             @db.VarChar(500)
+  executedAt     DateTime            @map("executed_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  camera         Camera              @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  room           Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("runtime_camera_logs")
+  @@index([cameraId, executedAt(sort: Desc)])
+  @@index([roomId, executedAt(sort: Desc)])
+}
+
+model RuntimeAlert {
+  id             String      @id @default(uuid()) @db.Uuid
+  roomId         String      @map("room_id") @db.Uuid
+  severity       AlertSeverity @map("severity") @db.VarChar(20)
+  source         String      @db.VarChar(100)
+  message        String      @db.VarChar(1000)
+  status         AlertStatus @default(ACTIVE) @map("status") @db.VarChar(20)
+  detailJson     Json?       @map("detail_json")
+  acknowledgedBy String?     @map("acknowledged_by") @db.Uuid
+  acknowledgedAt DateTime?   @map("acknowledged_at")
+  resolvedAt     DateTime?   @map("resolved_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  room           Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  acknowledger   User?       @relation(fields: [acknowledgedBy], references: [id], onDelete: SetNull)
+
+  @@map("runtime_alerts")
+  @@index([roomId, status])
+  @@index([severity, createdAt(sort: Desc)])
+}
+
+model RuntimeRecoveryLog {
+  id            String                @id @default(uuid()) @db.Uuid
+  roomId        String                @map("room_id") @db.Uuid
+  action        RuntimeRecoveryAction @map("action") @db.VarChar(50)
+  result        RuntimeRecoveryResult @map("result") @db.VarChar(20)
+  message       String?               @db.VarChar(1000)
+  executedBy    String?               @map("executed_by") @db.Uuid
+  executedAt    DateTime              @map("executed_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  room          Room                  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  executor      User?                 @relation(fields: [executedBy], references: [id], onDelete: SetNull)
+
+  @@map("runtime_recovery_logs")
+  @@index([roomId, executedAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
 }
 
 model AuditLog {

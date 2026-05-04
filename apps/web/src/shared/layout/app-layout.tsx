@@ -17,6 +17,30 @@ export function AppLayout() {
             Dashboard
           </NavLink>
           <div className="nav-section">
+            <span className="nav-section-title">Live Monitoring</span>
+            <NavLink to="/live" className="nav-link">
+              Live Dashboard
+            </NavLink>
+            <NavLink to="/live/map" className="nav-link">
+              Realtime Map
+            </NavLink>
+            <NavLink to="/live/speakers" className="nav-link">
+              Speakers
+            </NavLink>
+            <NavLink to="/live/cameras" className="nav-link">
+              Cameras
+            </NavLink>
+            <NavLink to="/live/events" className="nav-link">
+              Event Feed
+            </NavLink>
+            <NavLink to="/live/alerts" className="nav-link">
+              Alerts
+            </NavLink>
+            <NavLink to="/live/runtime-status" className="nav-link">
+              Runtime Status
+            </NavLink>
+          </div>
+          <div className="nav-section">
             <span className="nav-section-title">Runtime</span>
             <NavLink to="/runtime/map" className="nav-link">
               Map View

@@ -1,0 +1,1155 @@
+openapi: 3.0.3
+info:
+  title: TS-D1000 Live Monitoring API
+  version: 1.0.0
+  description: >
+    OpenAPI contract for the Live Monitoring module of the TS-D1000 Meeting Control Application.
+servers:
+  - url: /api/v1
+tags:
+  - name: Live Monitoring
+    description: Dashboard, map, speaker, camera, alerts, event feed, runtime status, and recovery APIs.
+security:
+  - bearerAuth: []
+paths:
+  /live/dashboard:
+    get:
+      tags: [Live Monitoring]
+      summary: Get live monitoring dashboard
+      description: Returns high-level dashboard state for the current room.
+      responses:
+        '200':
+          description: Dashboard data retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeDashboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/RuntimeUnavailable'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/snapshot:
+    get:
+      tags: [Live Monitoring]
+      summary: Get live runtime snapshot
+      description: Returns the latest runtime snapshot for dashboard and monitoring views.
+      responses:
+        '200':
+          description: Snapshot retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeSnapshot'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/RuntimeUnavailable'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/map:
+    get:
+      tags: [Live Monitoring]
+      summary: Get realtime map state
+      description: Returns floor layout and runtime device positions for map rendering.
+      responses:
+        '200':
+          description: Map state retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeMap'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/speakers/active:
+    get:
+      tags: [Live Monitoring]
+      summary: Get active speakers
+      description: Returns the list of currently active speaker units.
+      responses:
+        '200':
+          description: Active speaker list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeActiveSpeakers'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/requests/summary:
+    get:
+      tags: [Live Monitoring]
+      summary: Get pending request queue summary
+      description: Returns pending speaking request summary for Manual mode.
+      responses:
+        '200':
+          description: Pending request summary retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeRequestSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/units/{unitId}:
+    get:
+      tags: [Live Monitoring]
+      summary: Get unit runtime detail
+      description: Returns runtime detail for a specific unit.
+      parameters:
+        - $ref: '#/components/parameters/UnitId'
+      responses:
+        '200':
+          description: Unit detail retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeUnitDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/cameras/status:
+    get:
+      tags: [Live Monitoring]
+      summary: Get camera runtime status
+      description: Returns runtime status for configured cameras.
+      responses:
+        '200':
+          description: Camera status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeCameraStatuses'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/cameras/target:
+    get:
+      tags: [Live Monitoring]
+      summary: Get current camera targets
+      description: Returns current camera targets and associated unit/preset metadata.
+      responses:
+        '200':
+          description: Camera target retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeCameraTargets'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/cameras/triggers:
+    get:
+      tags: [Live Monitoring]
+      summary: Get camera trigger results
+      description: Returns recent camera trigger results for monitoring.
+      parameters:
+        - in: query
+          name: cameraId
+          schema:
+            type: string
+            format: uuid
+          description: Optional camera id filter.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum number of results.
+        - in: query
+          name: result
+          schema:
+            $ref: '#/components/schemas/CameraRuntimeResult'
+          description: Optional result filter.
+      responses:
+        '200':
+          description: Trigger results retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeCameraTriggers'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/events:
+    get:
+      tags: [Live Monitoring]
+      summary: Get live event feed
+      description: Returns the runtime event feed with filters and pagination.
+      parameters:
+        - in: query
+          name: eventType
+          schema:
+            type: string
+          description: Filter by event type.
+        - in: query
+          name: unitId
+          schema:
+            type: string
+            format: uuid
+          description: Filter by unit.
+        - in: query
+          name: result
+          schema:
+            $ref: '#/components/schemas/RuntimeEventResult'
+          description: Filter by event result.
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+          description: Start timestamp filter.
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+          description: End timestamp filter.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [occurredAt]
+            default: occurredAt
+          description: Sort field.
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort direction.
+      responses:
+        '200':
+          description: Event feed retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeEventFeed'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/alerts:
+    get:
+      tags: [Live Monitoring]
+      summary: Get runtime alerts
+      description: Returns runtime alerts with optional filters.
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/AlertStatus'
+          description: Alert status filter.
+        - in: query
+          name: severity
+          schema:
+            $ref: '#/components/schemas/AlertSeverity'
+          description: Alert severity filter.
+        - in: query
+          name: source
+          schema:
+            type: string
+          description: Alert source filter.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Alerts retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeAlertList'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/alerts/{id}/acknowledge:
+    post:
+      tags: [Live Monitoring]
+      summary: Acknowledge a runtime alert
+      description: Marks an alert as acknowledged. Does not resolve the alert.
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Alert acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeAlertAcknowledge'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/runtime/status:
+    get:
+      tags: [Live Monitoring]
+      summary: Get runtime connection status
+      description: Returns current SSE/runtime connection status and data freshness.
+      responses:
+        '200':
+          description: Runtime status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeRuntimeStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /live/runtime/recovery:
+    post:
+      tags: [Live Monitoring]
+      summary: Run runtime recovery action
+      description: Initiates a runtime recovery action. Admin only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimeRecoveryRequest'
+      responses:
+        '200':
+          description: Recovery action accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelopeRecovery'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/RecoveryAdminOnly'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+        '503':
+          $ref: '#/components/responses/RuntimeUnavailable'
+        '500':
+          $ref: '#/components/responses/SystemError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number.
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Page size.
+    UnitId:
+      name: unitId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unit UUID.
+    AlertId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Alert UUID.
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            unauthorized:
+              value:
+                success: false
+                error:
+                  code: UNAUTHORIZED
+                  message: Authentication required
+                  details: null
+    Forbidden:
+      description: Authenticated user does not have required permissions.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            forbidden:
+              value:
+                success: false
+                error:
+                  code: FORBIDDEN
+                  message: Access denied
+                  details: null
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            notFound:
+              value:
+                success: false
+                error:
+                  code: NOT_FOUND
+                  message: Resource not found
+                  details: null
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            validation:
+              value:
+                success: false
+                error:
+                  code: VALIDATION_ERROR
+                  message: Invalid request
+                  details: ["page must be >= 1"]
+    BusinessError:
+      description: Business rule violation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            businessError:
+              value:
+                success: false
+                error:
+                  code: BUSINESS_RULE_ERROR
+                  message: Business rule violation
+                  details: null
+    RecoveryAdminOnly:
+      description: Recovery action is restricted to Admins.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            recoveryForbidden:
+              value:
+                success: false
+                error:
+                  code: RECOVERY_ADMIN_ONLY
+                  message: Only Admin can run runtime recovery
+                  details: null
+    RuntimeUnavailable:
+      description: Runtime monitoring data is not available.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            unavailable:
+              value:
+                success: false
+                error:
+                  code: RUNTIME_UNAVAILABLE
+                  message: Runtime data unavailable
+                  details: null
+    SystemError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            systemError:
+              value:
+                success: false
+                error:
+                  code: SYSTEM_ERROR
+                  message: Unexpected server error
+                  details: null
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+    ErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request parameters
+            details:
+              type: array
+              items:
+                type: string
+              nullable: true
+    Pagination:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 120
+        totalPages:
+          type: integer
+          example: 6
+    RuntimeConnectionStatus:
+      type: string
+      enum: [CONNECTED, RECONNECTING, DISCONNECTED, UNAVAILABLE]
+    UnitRuntimeState:
+      type: string
+      enum: [IDLE, REQUEST, SPEAKING, OFFLINE]
+    CameraRuntimeResult:
+      type: string
+      enum: [SUCCESS, FAILED, SKIPPED]
+    AlertSeverity:
+      type: string
+      enum: [INFO, WARNING, ERROR, CRITICAL]
+    AlertStatus:
+      type: string
+      enum: [ACTIVE, ACKNOWLEDGED, RESOLVED]
+    RuntimeEventResult:
+      type: string
+      enum: [SUCCESS, FAILED, SKIPPED, IGNORED]
+    LiveDashboardData:
+      type: object
+      required: [roomId, operationMode, sseStatus, activeSpeakerCount, pendingRequestCount, activeAlerts]
+      properties:
+        roomId:
+          type: string
+          format: uuid
+        operationMode:
+          type: string
+          enum: [MANUAL, AUTOMATIC]
+        sseStatus:
+          $ref: '#/components/schemas/RuntimeConnectionStatus'
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+        activeSpeakerCount:
+          type: integer
+          example: 1
+        pendingRequestCount:
+          type: integer
+          example: 3
+        currentCameraTarget:
+          type: object
+          nullable: true
+          properties:
+            cameraId:
+              type: string
+              format: uuid
+            cameraName:
+              type: string
+            unitId:
+              type: string
+              format: uuid
+            unitName:
+              type: string
+            presetId:
+              type: string
+              format: uuid
+            presetName:
+              type: string
+        activeAlerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/LiveAlertSummary'
+    LiveAlertSummary:
+      type: object
+      required: [id, severity, source, message, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        source:
+          type: string
+        message:
+          type: string
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+        createdAt:
+          type: string
+          format: date-time
+    SuccessEnvelopeDashboard:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/LiveDashboardData'
+    SnapshotUnit:
+      type: object
+      required: [unitId, unitName, deviceType, state]
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        unitName:
+          type: string
+        deviceType:
+          type: string
+          example: DELEGATE
+        state:
+          $ref: '#/components/schemas/UnitRuntimeState'
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+    SnapshotCamera:
+      type: object
+      required: [cameraId, cameraName, status]
+      properties:
+        cameraId:
+          type: string
+          format: uuid
+        cameraName:
+          type: string
+        status:
+          type: string
+        lastResult:
+          $ref: '#/components/schemas/CameraRuntimeResult'
+    LiveSnapshotData:
+      type: object
+      required: [roomState, units, cameras]
+      properties:
+        roomState:
+          type: object
+          properties:
+            operationMode:
+              type: string
+              enum: [MANUAL, AUTOMATIC]
+            sseStatus:
+              $ref: '#/components/schemas/RuntimeConnectionStatus'
+            updatedAt:
+              type: string
+              format: date-time
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnapshotUnit'
+        cameras:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnapshotCamera'
+    SuccessEnvelopeSnapshot:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/LiveSnapshotData'
+    LayoutInfo:
+      type: object
+      required: [id, filePath, fileType]
+      properties:
+        id:
+          type: string
+          format: uuid
+        filePath:
+          type: string
+        fileType:
+          type: string
+          enum: [PDF, JPG, JPEG]
+    MapDevice:
+      type: object
+      required: [refType, refId, label, posX, posY, runtimeState]
+      properties:
+        refType:
+          type: string
+          enum: [TSD_UNIT, CAMERA]
+        refId:
+          type: string
+          format: uuid
+        label:
+          type: string
+        posX:
+          type: number
+          minimum: 0
+          maximum: 1
+        posY:
+          type: number
+          minimum: 0
+          maximum: 1
+        runtimeState:
+          type: string
+    LiveMapData:
+      type: object
+      required: [layout, devices]
+      properties:
+        layout:
+          oneOf:
+            - $ref: '#/components/schemas/LayoutInfo'
+            - type: 'null'
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapDevice'
+    SuccessEnvelopeMap:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/LiveMapData'
+    ActiveSpeakerItem:
+      type: object
+      required: [unitId, unitName, deviceType, state]
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        unitName:
+          type: string
+        deviceType:
+          type: string
+        state:
+          $ref: '#/components/schemas/UnitRuntimeState'
+        speakingSince:
+          type: string
+          format: date-time
+        mappedCameraId:
+          type: string
+          format: uuid
+          nullable: true
+        mappedCameraName:
+          type: string
+          nullable: true
+        mappedPresetId:
+          type: string
+          format: uuid
+          nullable: true
+        mappedPresetName:
+          type: string
+          nullable: true
+    SuccessEnvelopeActiveSpeakers:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ActiveSpeakerItem'
+    RequestSummaryItem:
+      type: object
+      required: [requestId, unitId, unitName, requestedAt]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        unitId:
+          type: string
+          format: uuid
+        unitName:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+    RequestSummaryData:
+      type: object
+      required: [operationMode, queueUsed, pendingRequestCount, pendingRequests]
+      properties:
+        operationMode:
+          type: string
+          enum: [MANUAL, AUTOMATIC]
+        queueUsed:
+          type: boolean
+        pendingRequestCount:
+          type: integer
+        pendingRequests:
+          type: array
+          items:
+            $ref: '#/components/schemas/RequestSummaryItem'
+    SuccessEnvelopeRequestSummary:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/RequestSummaryData'
+    UnitDetailMapping:
+      type: object
+      required: [cameraId, cameraName, presetId, presetName]
+      properties:
+        cameraId:
+          type: string
+          format: uuid
+        cameraName:
+          type: string
+        presetId:
+          type: string
+          format: uuid
+        presetName:
+          type: string
+    UnitDetailData:
+      type: object
+      required: [unitId, externalUnitId, unitName, deviceType, state]
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        externalUnitId:
+          type: string
+          nullable: true
+        unitName:
+          type: string
+        deviceType:
+          type: string
+        state:
+          $ref: '#/components/schemas/UnitRuntimeState'
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+        mapping:
+          oneOf:
+            - $ref: '#/components/schemas/UnitDetailMapping'
+            - type: 'null'
+    SuccessEnvelopeUnitDetail:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/UnitDetailData'
+    CameraStatusItem:
+      type: object
+      required: [cameraId, cameraName, status]
+      properties:
+        cameraId:
+          type: string
+          format: uuid
+        cameraName:
+          type: string
+        status:
+          type: string
+        currentTargetUnitId:
+          type: string
+          format: uuid
+          nullable: true
+        currentPresetId:
+          type: string
+          format: uuid
+          nullable: true
+        lastSwitchAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastResult:
+          $ref: '#/components/schemas/CameraRuntimeResult'
+          nullable: true
+    SuccessEnvelopeCameraStatuses:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CameraStatusItem'
+    CameraTargetItem:
+      type: object
+      required: [cameraId, cameraName]
+      properties:
+        cameraId:
+          type: string
+          format: uuid
+        cameraName:
+          type: string
+        targetUnitId:
+          type: string
+          format: uuid
+          nullable: true
+        targetUnitName:
+          type: string
+          nullable: true
+        presetId:
+          type: string
+          format: uuid
+          nullable: true
+        presetName:
+          type: string
+          nullable: true
+        switchedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastResult:
+          $ref: '#/components/schemas/CameraRuntimeResult'
+          nullable: true
+    SuccessEnvelopeCameraTargets:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CameraTargetItem'
+    CameraTriggerItem:
+      type: object
+      required: [cameraId, result, triggeredAt]
+      properties:
+        cameraId:
+          type: string
+          format: uuid
+        targetUnitId:
+          type: string
+          format: uuid
+          nullable: true
+        presetId:
+          type: string
+          format: uuid
+          nullable: true
+        result:
+          $ref: '#/components/schemas/CameraRuntimeResult'
+        reason:
+          type: string
+          nullable: true
+        triggeredAt:
+          type: string
+          format: date-time
+    SuccessEnvelopeCameraTriggers:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CameraTriggerItem'
+    EventFeedItem:
+      type: object
+      required: [id, time, eventType, result]
+      properties:
+        id:
+          type: string
+          format: uuid
+        time:
+          type: string
+          format: date-time
+        eventType:
+          type: string
+        unitName:
+          type: string
+          nullable: true
+        result:
+          $ref: '#/components/schemas/RuntimeEventResult'
+        message:
+          type: string
+    EventFeedData:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventFeedItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    SuccessEnvelopeEventFeed:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/EventFeedData'
+    AlertItem:
+      type: object
+      required: [id, severity, source, message, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        source:
+          type: string
+        message:
+          type: string
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+        createdAt:
+          type: string
+          format: date-time
+    AlertListData:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    SuccessEnvelopeAlertList:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AlertListData'
+    AlertAcknowledgeData:
+      type: object
+      required: [alertId, status, acknowledgedAt]
+      properties:
+        alertId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+        acknowledgedAt:
+          type: string
+          format: date-time
+    SuccessEnvelopeAlertAcknowledge:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AlertAcknowledgeData'
+    RuntimeStatusData:
+      type: object
+      required: [sseStatus, isDataStale]
+      properties:
+        sseStatus:
+          $ref: '#/components/schemas/RuntimeConnectionStatus'
+        lastConnectedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastDisconnectedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+        isDataStale:
+          type: boolean
+    SuccessEnvelopeRuntimeStatus:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/RuntimeStatusData'
+    RuntimeRecoveryRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [RECONNECT, RECOVER_STATE, REFRESH_SNAPSHOT]
+    RuntimeRecoveryData:
+      type: object
+      required: [action, result]
+      properties:
+        action:
+          type: string
+          enum: [RECONNECT, RECOVER_STATE, REFRESH_SNAPSHOT]
+        result:
+          type: string
+          enum: [SUCCESS, FAILED]
+        message:
+          type: string
+          nullable: true
+    SuccessEnvelopeRecovery:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/RuntimeRecoveryData'

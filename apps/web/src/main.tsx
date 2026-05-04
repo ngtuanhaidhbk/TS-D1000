@@ -15,6 +15,13 @@ import { LoginPage } from './views/login-page';
 import { MappingsPage } from './views/mappings-page';
 import { ModeConfigPage } from './views/mode-config-page';
 import { ReadinessCheckPage } from './views/readiness-check-page';
+import { LiveDashboardPage } from './views/live-dashboard-page';
+import { LiveMapPage } from './views/live-map-page';
+import { LiveSpeakersPage } from './views/live-speakers-page';
+import { LiveCamerasPage } from './views/live-cameras-page';
+import { LiveEventsPage } from './views/live-events-page';
+import { LiveAlertsPage } from './views/live-alerts-page';
+import { LiveRuntimeStatusPage } from './views/live-runtime-status-page';
 import { RuntimeCameraViewPage } from './views/runtime-camera-view-page';
 import { RuntimeManualControlPage } from './views/runtime-manual-control-page';
 import { RuntimeMapViewPage } from './views/runtime-map-view-page';
@@ -59,6 +66,34 @@ const router = createBrowserRouter([
       {
         path: 'runtime/monitor',
         element: <RuntimeMonitorPage />,
+      },
+      {
+        path: 'live',
+        element: <LiveDashboardPage />,
+      },
+      {
+        path: 'live/map',
+        element: <LiveMapPage />,
+      },
+      {
+        path: 'live/speakers',
+        element: <LiveSpeakersPage />,
+      },
+      {
+        path: 'live/cameras',
+        element: <LiveCamerasPage />,
+      },
+      {
+        path: 'live/events',
+        element: <LiveEventsPage />,
+      },
+      {
+        path: 'live/alerts',
+        element: <LiveAlertsPage />,
+      },
+      {
+        path: 'live/runtime-status',
+        element: <LiveRuntimeStatusPage />,
       },
       {
         path: 'config',

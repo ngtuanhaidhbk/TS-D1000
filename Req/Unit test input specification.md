@@ -19,6 +19,9 @@ It defines what must be tested, which inputs should be used, what must be mocked
 - System detail design in `Req/Detail design document.md`
 - Authentication detail design in `Req/Detail design - Authentication.md`
 - Authentication UI/UX in `Req/UI UX design - Authentication.md`
+- Live Monitoring detail design in `Req/Detail design - Live Monitoring.md`
+- Live Monitoring UI/UX in `Req/UI UX design - Live Monitoring.md`
+- Live Monitoring API contract in `Req/API contract - Live Monitoring.md`
 - API contracts embedded in the detail design documents
 
 ### 1.2 Roles In Scope

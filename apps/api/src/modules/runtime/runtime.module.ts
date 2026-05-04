@@ -26,5 +26,12 @@ import { RuntimeSnapshotService } from './services/runtime-snapshot.service';
     RuntimeCameraMonitoringService,
     RuntimeCameraTriggerService,
   ],
+  exports: [
+    RuntimeRoomStateRepository,
+    SpeakingRequestsRepository,
+    RuntimeCameraStateRepository,
+    RuntimeCameraLogsRepository,
+    RuntimeSnapshotService,
+  ],
 })
 export class RuntimeModule {}
