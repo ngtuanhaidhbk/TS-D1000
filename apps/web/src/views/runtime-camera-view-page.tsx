@@ -32,7 +32,8 @@ export function RuntimeCameraViewPage() {
   const selectedPresets = presetsByCamera[selectedCameraId] ?? [];
 
   useEffect(() => {
-    if (!token) return;
+    const authToken = token;
+    if (!authToken) return;
     let cancelled = false;
 
     async function load() {
@@ -40,8 +41,8 @@ export function RuntimeCameraViewPage() {
       setError(null);
       try {
         const [snap, cameraResponse] = await Promise.all([
-          runtimeApi.getSnapshot(token),
-          systemConfigApi.listCameras(token),
+          runtimeApi.getSnapshot(authToken),
+          systemConfigApi.listCameras(authToken),
         ]);
         if (!cancelled) {
           setSnapshot(snap);
@@ -51,8 +52,8 @@ export function RuntimeCameraViewPage() {
         }
 
         try {
-          const config = await systemConfigApi.getTsdConfig(token);
-          const unitsResponse = await systemConfigApi.listUnits(config.id, token);
+          const config = await systemConfigApi.getTsdConfig(authToken);
+          const unitsResponse = await systemConfigApi.listUnits(config.id, authToken);
           if (!cancelled) setUnitsById(Object.fromEntries(unitsResponse.items.map((unit) => [unit.id, unit])));
         } catch (apiError) {
           if (!(apiError instanceof ApiClientError) || apiError.code !== 'CONFIG_NOT_FOUND') {
@@ -70,7 +71,7 @@ export function RuntimeCameraViewPage() {
     void load();
     const handle = window.setInterval(async () => {
       try {
-        const snap = await runtimeApi.getSnapshot(token);
+        const snap = await runtimeApi.getSnapshot(authToken);
         if (!cancelled) setSnapshot(snap);
       } catch {
         // non-blocking
@@ -84,7 +85,8 @@ export function RuntimeCameraViewPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!token || !selectedCameraId) {
+    const authToken = token;
+    if (!authToken || !selectedCameraId) {
       setSelectedPresetId('');
       setRuntimeStatus(null);
       setRuntimeLogs([]);
@@ -93,7 +95,7 @@ export function RuntimeCameraViewPage() {
     let cancelled = false;
     async function loadPresets() {
       try {
-        const response = await systemConfigApi.listPresets(selectedCameraId, token);
+        const response = await systemConfigApi.listPresets(selectedCameraId, authToken);
         if (!cancelled) {
           setPresetsByCamera((value) => ({ ...value, [selectedCameraId]: response.items }));
           setSelectedPresetId((current) => current || response.items[0]?.id || '');
@@ -112,7 +114,8 @@ export function RuntimeCameraViewPage() {
   }, [token, selectedCameraId]);
 
   useEffect(() => {
-    if (!token || !selectedCameraId) {
+    const authToken = token;
+    if (!authToken || !selectedCameraId) {
       return;
     }
     let cancelled = false;
@@ -120,8 +123,8 @@ export function RuntimeCameraViewPage() {
     async function loadMonitoring() {
       try {
         const [status, logs] = await Promise.all([
-          runtimeApi.getCameraStatus(selectedCameraId, token),
-          runtimeApi.listCameraLogs(selectedCameraId, token, new URLSearchParams({ page: '1', pageSize: '10' })),
+          runtimeApi.getCameraStatus(selectedCameraId, authToken),
+          runtimeApi.listCameraLogs(selectedCameraId, authToken, new URLSearchParams({ page: '1', pageSize: '10' })),
         ]);
         if (!cancelled) {
           setRuntimeStatus(status);
@@ -144,11 +147,12 @@ export function RuntimeCameraViewPage() {
   }, [token, selectedCameraId]);
 
   async function recallPreset() {
-    if (!token || !selectedCameraId || !selectedPresetId) return;
+    const authToken = token;
+    if (!authToken || !selectedCameraId || !selectedPresetId) return;
     setManualBusy(true);
     setError(null);
     try {
-      await runtimeApi.recallPreset(selectedCameraId, selectedPresetId, token);
+      await runtimeApi.recallPreset(selectedCameraId, selectedPresetId, authToken);
     } catch (apiError) {
       setError(apiError instanceof ApiClientError ? apiError.message : 'Unable to recall preset');
     } finally {
@@ -157,11 +161,12 @@ export function RuntimeCameraViewPage() {
   }
 
   async function move(action: 'PAN_LEFT' | 'PAN_RIGHT' | 'TILT_UP' | 'TILT_DOWN' | 'ZOOM_IN' | 'ZOOM_OUT') {
-    if (!token || !selectedCameraId) return;
+    const authToken = token;
+    if (!authToken || !selectedCameraId) return;
     setManualBusy(true);
     setError(null);
     try {
-      await runtimeApi.moveCamera(selectedCameraId, { action, speed: 5 }, token);
+      await runtimeApi.moveCamera(selectedCameraId, { action, speed: 5 }, authToken);
     } catch (apiError) {
       setError(apiError instanceof ApiClientError ? apiError.message : 'Unable to move camera');
     } finally {
@@ -170,11 +175,12 @@ export function RuntimeCameraViewPage() {
   }
 
   async function stop() {
-    if (!token || !selectedCameraId) return;
+    const authToken = token;
+    if (!authToken || !selectedCameraId) return;
     setManualBusy(true);
     setError(null);
     try {
-      await runtimeApi.stopCamera(selectedCameraId, token);
+      await runtimeApi.stopCamera(selectedCameraId, authToken);
     } catch (apiError) {
       setError(apiError instanceof ApiClientError ? apiError.message : 'Unable to stop camera');
     } finally {

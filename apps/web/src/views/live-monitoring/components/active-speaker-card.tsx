@@ -1,4 +1,4 @@
-import type { DashboardResponse } from '../../shared/types/live-monitoring';
+import type { DashboardResponse } from '../../../shared/types/live-monitoring';
 
 export function ActiveSpeakerCard({ dashboard }: { dashboard: DashboardResponse }) {
   return (

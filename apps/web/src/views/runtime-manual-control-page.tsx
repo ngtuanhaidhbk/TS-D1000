@@ -20,7 +20,8 @@ export function RuntimeManualControlPage() {
   const pending = useMemo(() => requests.filter((item) => item.status === 'PENDING'), [requests]);
 
   useEffect(() => {
-    if (!token) return;
+    const authToken = token;
+    if (!authToken) return;
     let cancelled = false;
 
     async function load() {
@@ -28,11 +29,15 @@ export function RuntimeManualControlPage() {
       setError(null);
       try {
         const snap = await runtimeApi.getSnapshot(token);
-        const reqs = await runtimeApi.listRequests(token, new URLSearchParams({ status: 'PENDING', page: '1', pageSize: '50' }));
+        const snapRes = await runtimeApi.getSnapshot(authToken);
+        const reqs = await runtimeApi.listRequests(
+          authToken,
+          new URLSearchParams({ status: 'PENDING', page: '1', pageSize: '50' }),
+        );
         let units: TsdUnit[] = [];
         try {
-          const config = await systemConfigApi.getTsdConfig(token);
-          const unitsResponse = await systemConfigApi.listUnits(config.id, token);
+          const config = await systemConfigApi.getTsdConfig(authToken);
+          const unitsResponse = await systemConfigApi.listUnits(config.id, authToken);
           units = unitsResponse.items;
         } catch (apiError) {
           // If TS-D not configured yet, still render runtime view without unit metadata.
@@ -42,7 +47,7 @@ export function RuntimeManualControlPage() {
         }
 
         if (cancelled) return;
-        setSnapshot(snap);
+        setSnapshot(snapRes);
         setRequests(reqs.items);
         setUnitsById(Object.fromEntries(units.map((unit) => [unit.id, unit])));
       } catch (apiError) {
@@ -62,13 +67,14 @@ export function RuntimeManualControlPage() {
   }, [token]);
 
   async function approve(id: string) {
-    if (!token) return;
+    const authToken = token;
+    if (!authToken) return;
     setError(null);
     try {
-      await runtimeApi.approveRequest(id, token);
+      await runtimeApi.approveRequest(id, authToken);
       const [snap, reqs] = await Promise.all([
-        runtimeApi.getSnapshot(token),
-        runtimeApi.listRequests(token, new URLSearchParams({ status: 'PENDING', page: '1', pageSize: '50' })),
+        runtimeApi.getSnapshot(authToken),
+        runtimeApi.listRequests(authToken, new URLSearchParams({ status: 'PENDING', page: '1', pageSize: '50' })),
       ]);
       setSnapshot(snap);
       setRequests(reqs.items);
@@ -78,15 +84,16 @@ export function RuntimeManualControlPage() {
   }
 
   async function reject(id: string) {
-    if (!token) return;
+    const authToken = token;
+    if (!authToken) return;
     const confirmed = window.confirm('Reject this request?');
     if (!confirmed) return;
     setError(null);
     try {
-      await runtimeApi.rejectRequest(id, token);
+      await runtimeApi.rejectRequest(id, authToken);
       const [snap, reqs] = await Promise.all([
-        runtimeApi.getSnapshot(token),
-        runtimeApi.listRequests(token, new URLSearchParams({ status: 'PENDING', page: '1', pageSize: '50' })),
+        runtimeApi.getSnapshot(authToken),
+        runtimeApi.listRequests(authToken, new URLSearchParams({ status: 'PENDING', page: '1', pageSize: '50' })),
       ]);
       setSnapshot(snap);
       setRequests(reqs.items);

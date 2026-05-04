@@ -28,6 +28,11 @@ import { RuntimeMapViewPage } from './views/runtime-map-view-page';
 import { RuntimeMonitorPage } from './views/runtime-monitor-page';
 import { TsdConfigPage } from './views/tsd-config-page';
 import { UnauthorizedPage } from './views/unauthorized-page';
+import { LogsOverviewPage } from './views/logs-overview-page';
+import { LogsRuntimePage } from './views/logs-runtime-page';
+import { LogsCameraPage } from './views/logs-camera-page';
+import { LogsErrorsPage } from './views/logs-errors-page';
+import { LogsAuditPage } from './views/logs-audit-page';
 import './styles.css';
 
 const router = createBrowserRouter([
@@ -128,6 +133,30 @@ const router = createBrowserRouter([
         element: (
           <RoleRoute allowedRoles={['ADMIN']}>
             <AdminPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'logs',
+        element: <LogsOverviewPage />,
+      },
+      {
+        path: 'logs/runtime',
+        element: <LogsRuntimePage />,
+      },
+      {
+        path: 'logs/camera',
+        element: <LogsCameraPage />,
+      },
+      {
+        path: 'logs/errors',
+        element: <LogsErrorsPage />,
+      },
+      {
+        path: 'logs/audit',
+        element: (
+          <RoleRoute allowedRoles={['ADMIN']}>
+            <LogsAuditPage />
           </RoleRoute>
         ),
       },

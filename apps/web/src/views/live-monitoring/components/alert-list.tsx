@@ -1,4 +1,4 @@
-import type { RuntimeAlert } from '../../shared/types/live-monitoring';
+import type { RuntimeAlert } from '../../../shared/types/live-monitoring';
 
 const severityColors: Record<string, string> = {
   INFO: '#0066cc',

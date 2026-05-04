@@ -84,7 +84,26 @@ export function AppLayout() {
               User Management
             </NavLink>
           ) : null}
-          {isAdmin ? <span className="nav-link nav-link-muted">Logs</span> : null}
+          <div className="nav-section">
+            <span className="nav-section-title">Logs</span>
+            <NavLink to="/logs" className="nav-link">
+              All Logs
+            </NavLink>
+            {isAdmin ? (
+              <NavLink to="/logs/audit" className="nav-link">
+                Audit Logs
+              </NavLink>
+            ) : null}
+            <NavLink to="/logs/runtime" className="nav-link">
+              Runtime Logs
+            </NavLink>
+            <NavLink to="/logs/camera" className="nav-link">
+              Camera Logs
+            </NavLink>
+            <NavLink to="/logs/errors" className="nav-link">
+              System Errors
+            </NavLink>
+          </div>
         </nav>
       </aside>
 

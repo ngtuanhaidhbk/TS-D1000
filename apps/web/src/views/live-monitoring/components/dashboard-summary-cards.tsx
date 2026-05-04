@@ -1,4 +1,4 @@
-import type { DashboardResponse } from '../../shared/types/live-monitoring';
+import type { DashboardResponse } from '../../../shared/types/live-monitoring';
 
 const statusColors: Record<string, string> = {
   CONNECTED: '#0f0',

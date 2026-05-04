@@ -1,4 +1,4 @@
-import type { DashboardResponse } from '../../shared/types/live-monitoring';
+import type { DashboardResponse } from '../../../shared/types/live-monitoring';
 
 export function CameraTargetCard({ dashboard }: { dashboard: DashboardResponse }) {
   const target = dashboard.currentCameraTarget;

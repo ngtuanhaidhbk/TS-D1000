@@ -36,19 +36,20 @@ export function RuntimeMapViewPage() {
   }, [devices, snapshot, unitsById]);
 
   useEffect(() => {
-    if (!token) return;
+    const authToken = token;
+    if (!authToken) return;
     let cancelled = false;
 
     async function loadBase() {
       setLoading(true);
       setError(null);
       try {
-        const snap = await runtimeApi.getSnapshot(token);
+        const snap = await runtimeApi.getSnapshot(authToken);
         setSnapshot(snap);
 
         let configId: string | null = null;
         try {
-          const config = await systemConfigApi.getTsdConfig(token);
+          const config = await systemConfigApi.getTsdConfig(authToken);
           configId = config.id;
         } catch (apiError) {
           if (!(apiError instanceof ApiClientError) || apiError.code !== 'CONFIG_NOT_FOUND') {
@@ -57,7 +58,7 @@ export function RuntimeMapViewPage() {
         }
 
         if (configId) {
-          const unitsResponse = await systemConfigApi.listUnits(configId, token);
+          const unitsResponse = await systemConfigApi.listUnits(configId, authToken);
           if (!cancelled) {
             setUnitsById(Object.fromEntries(unitsResponse.items.map((unit) => [unit.id, unit])));
           }
@@ -66,8 +67,8 @@ export function RuntimeMapViewPage() {
         }
 
         try {
-          const layoutResponse = await systemConfigApi.getLayout(token);
-          const deviceResponse = await systemConfigApi.listLayoutDevices(token);
+          const layoutResponse = await systemConfigApi.getLayout(authToken);
+          const deviceResponse = await systemConfigApi.listLayoutDevices(authToken);
           if (!cancelled) {
             setLayout(layoutResponse);
             setDevices(deviceResponse.items);
@@ -92,7 +93,7 @@ export function RuntimeMapViewPage() {
     void loadBase();
     const handle = window.setInterval(async () => {
       try {
-        const snap = await runtimeApi.getSnapshot(token);
+        const snap = await runtimeApi.getSnapshot(authToken);
         if (!cancelled) setSnapshot(snap);
       } catch {
         // non-blocking
@@ -160,4 +161,3 @@ export function RuntimeMapViewPage() {
     </section>
   );
 }
-
